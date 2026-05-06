@@ -1177,18 +1177,20 @@ const API = 'https://nba-win-predictor-airk.onrender.com';
 const BDL_KEY = '0a853bd2-7b7d-48f8-9bb4-aa7f6e74a613';
 
 function renderMd(t) {
-  if (!t) return '';
   return t
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/### (.+)/g,'<strong style="font-size:13px;color:var(--green)">$1</strong>')
-    .replace(/## (.+)/g,'<strong style="font-size:14px;color:var(--green)">$1</strong>')
-    .replace(/# (.+)/g,'<strong style="font-size:15px;color:var(--green)">$1</strong>')
-    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g,'<em>$1</em>')
-    .replace(/\n\n/g,'<br><br>')
-    .replace(/\n/g,'<br>');
-}
+    .replace(/### (.+)/g,'<strong style="font-size:13px;color:var(--green)"></strong>')
+    .replace(/## (.+)/g,'<strong style="font-size:14px;color:var(--green)"></strong>')
+    .replace(/# (.+)/g,'<strong style="font-size:15px;color:var(--green)"></strong>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong></strong>')
+    .replace(/\*(.+?)\*/g,'<em></em>')
+    .replace(/
 
+/g,'<br><br>')
+    .replace(/
+/g,'<br>');
+}
+let anthropicKey = localStorage.getItem('edge_api_key') || '';
 let allGames = [];
 let currentFilter = 'all';
 let analyzerSport = 'nba';
@@ -1213,10 +1215,12 @@ document.addEventListener('DOMContentLoaded', () => {
   checkAPI();
   loadAllGames();
   populateTeamSelects('nba');
+  if (!anthropicKey) promptKey();
 });
 
-function promptKey() {}
+function promptKey() {
   const k = prompt('Enter your Anthropic API key for AI analysis (starts with sk-ant-):');
+  if (k && k.startsWith('sk-ant-')) { anthropicKey = k; localStorage.setItem('edge_api_key', k); }
 }
 
 async function checkAPI() {
@@ -1454,6 +1458,7 @@ function toggleGame(id) {
 }
 
 async function analyzeGame(id, home, away, sport, mp, vp, edge) {
+  if (!anthropicKey) { promptKey(); return; }
   const el = document.getElementById('ai-'+id);
   el.innerHTML = '<span class="spinner"></span> Searching for injury news and analyzing...';
   el.style.color = 'var(--text2)';
@@ -1463,7 +1468,7 @@ Model prediction: Home wins ${mp}% | Vegas implied: ${vp}% | Edge: ${edge>0?'+':
 Search for current injury reports, lineup news, recent form for both teams.
 Give a concise 3-4 sentence betting analysis. Focus on whether the model edge is supported by news.`;
   try {
-    const r = await fetch('/claude',{
+    const r = await fetch('https://nba-win-predictor-airk.onrender.com/claude',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:400,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})
@@ -1561,6 +1566,7 @@ async function runMatchupPrediction() {
 }
 
 async function generateMatchupAnalysis() {
+  if (!anthropicKey) { promptKey(); return; }
   if (!lastPredHome) { alert('Run a prediction first.'); return; }
   const el = document.getElementById('analysis-text');
   const btn = document.getElementById('gen-analysis-btn');
@@ -1583,7 +1589,7 @@ Search for:
 Provide a thorough 5-6 sentence analysis covering the key factors that will determine the outcome and whether this is a good betting opportunity.`;
 
   try {
-    const r = await fetch('/claude',{
+    const r = await fetch('https://nba-win-predictor-airk.onrender.com/claude',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:700,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})
@@ -1599,6 +1605,7 @@ Provide a thorough 5-6 sentence analysis covering the key factors that will dete
 function quickChat(el) { document.getElementById('chatInput').value=el.textContent; sendChat(); }
 
 async function sendChat() {
+  if (!anthropicKey) { promptKey(); return; }
   const input = document.getElementById('chatInput');
   const msg = input.value.trim();
   if (!msg) return;
@@ -1620,7 +1627,7 @@ ${gamesCtx}
 
 Always search for current injury reports when analyzing specific games. Be specific, cite current news, and be honest about uncertainty.`;
   try {
-    const r = await fetch('/claude',{
+    const r = await fetch('https://nba-win-predictor-airk.onrender.com/claude',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,system:sys,tools:[{type:'web_search_20250305',name:'web_search'}],messages:chatHistory})
