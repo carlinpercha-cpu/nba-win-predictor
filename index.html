@@ -1360,7 +1360,7 @@ async function runPredictions() {
 }
 
 function buildPayload(g) {
-  const p = { sport: g.sport, is_home: 1 };
+  const p = { sport: g.sport, is_home: 1, game_id: g.id, home_team: g.homeTeam, away_team: g.awayTeam };
   const v = (g.vegasProb !== null && !isNaN(g.vegasProb)) ? g.vegasProb : 0.55;
   const s = (g.spread !== null && !isNaN(g.spread)) ? g.spread : -3;
   if (g.sport==='nba') Object.assign(p,{Vegas_WinProb:v,OPP_Vegas_WinProb:1-v,Vegas_WinProb_Edge:v-.5,Vegas_Favored:v>.5?1:0,Vegas_Spread:s,Last_5_WinRate:0.5,Last_10_WinRate:0.5});
