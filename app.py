@@ -3,11 +3,13 @@ from flask_cors import CORS
 import joblib
 import numpy as np
 import os
+import requests
 
 app = Flask(__name__)
 CORS(app)
 
 MODEL_DIR = os.path.join(os.path.dirname(__file__), 'models')
+ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 
 def load_model(sport):
     model    = joblib.load(os.path.join(MODEL_DIR, f'{sport}_model.pkl'))
@@ -34,7 +36,7 @@ def health():
         'model_performance': {
             'nba':          {'auc': 0.727, 'accuracy': 0.665},
             'nfl':          {'auc': 0.710, 'accuracy': 0.660},
-            'mlb':          {'auc': 0.653, 'accuracy': 0.592},
+            'mlb':          {'auc': 0.617, 'accuracy': 0.592},
             'ncaab':        {'auc': 0.862, 'accuracy': 0.774},
             'ncaab_bracket':{'auc': 0.927, 'accuracy': 0.839},
             'cfb':          {'auc': 0.867, 'accuracy': 0.776},
@@ -53,7 +55,6 @@ def predict():
     model, scaler, features = models[sport]
 
     try:
-        # Build feature vector from request
         feature_vector = []
         missing = []
         for f in features:
@@ -78,6 +79,28 @@ def predict():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/claude', methods=['POST'])
+def claude_proxy():
+    if not ANTHROPIC_API_KEY:
+        return jsonify({'error': 'API key not configured'}), 500
+
+    try:
+        body = request.get_json()
+        response = requests.post(
+            'https://api.anthropic.com/v1/messages',
+            headers={
+                'Content-Type': 'application/json',
+                'x-api-key': ANTHROPIC_API_KEY,
+                'anthropic-version': '2023-06-01',
+            },
+            json=body,
+            timeout=60
+        )
+        return jsonify(response.json()), response.status_code
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/features/<sport>')
 def get_features(sport):
     if sport not in models:
@@ -91,7 +114,7 @@ def get_sports():
         'sports': [
             {'key': 'nba',           'name': 'NBA Basketball',         'auc': 0.727},
             {'key': 'nfl',           'name': 'NFL Football',           'auc': 0.710},
-            {'key': 'mlb',           'name': 'MLB Baseball',           'auc': 0.653},
+            {'key': 'mlb',           'name': 'MLB Baseball',           'auc': 0.617},
             {'key': 'ncaab',         'name': 'College Basketball',     'auc': 0.862},
             {'key': 'ncaab_bracket', 'name': 'March Madness Bracket',  'auc': 0.927},
             {'key': 'cfb',           'name': 'College Football',       'auc': 0.867},
