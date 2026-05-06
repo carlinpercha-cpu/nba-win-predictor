@@ -1175,20 +1175,6 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
 <script>
 const API = 'https://nba-win-predictor-airk.onrender.com';
 const BDL_KEY = '0a853bd2-7b7d-48f8-9bb4-aa7f6e74a613';
-const ODDS_KEY = '465c281c797b25ab75b326e3e0828a9f';
-
-function renderMd(t) {
-  if (!t) return '';
-  return t
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/### (.+)/g,'<strong style="font-size:13px;color:var(--green)">$1</strong>')
-    .replace(/## (.+)/g,'<strong style="font-size:14px;color:var(--green)">$1</strong>')
-    .replace(/# (.+)/g,'<strong style="font-size:15px;color:var(--green)">$1</strong>')
-    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g,'<em>$1</em>')
-    .replace(/\n\n/g,'<br><br>')
-    .replace(/\n/g,'<br>');
-}
 let anthropicKey = localStorage.getItem('edge_api_key') || '';
 let allGames = [];
 let currentFilter = 'all';
@@ -1253,37 +1239,6 @@ function formatTime(t) {
   return t;
 }
 
-
-// ---- ODDS API ----
-async function fetchOdds() {
-  const oddsMap = {};
-  const sports = [
-    ['baseball_mlb','mlb'],
-    ['basketball_nba','nba'],
-    ['americanfootball_nfl','nfl'],
-    ['icehockey_nhl','nhl'],
-    ['basketball_ncaab','ncaab'],
-    ['americanfootball_ncaaf','cfb'],
-  ];
-  await Promise.allSettled(sports.map(async ([apiSport, key]) => {
-    try {
-      const r = await fetch(`https://api.the-odds-api.com/v4/sports/${apiSport}/odds/?apiKey=${ODDS_KEY}&regions=us&markets=h2h,spreads&oddsFormat=american`);
-      const games = await r.json();
-      (games||[]).forEach(g => {
-        const home = g.home_team;
-        const away = g.away_team;
-        let homeML = null, spread = null;
-        (g.bookmakers||[]).slice(0,1).forEach(bk         (g.bookmakers||[]s|        (g.bookmakers||[]).slice(0,1).forEach(bk         (g.b          (g.bookmakers||[]).slice(0,1).forEach(bk         (g.bookmakers||[]s|        (g.bookmakers||[]).slice(0,1).             (g.bookmakers||[]).slice(0,1).forEa          (g.b = mkt.outcomes.find(o=>        (g.bookmakers||[]).   if (ho) spread = ho.p        (g.bookma }        (g.bookmakers||[])
-        if (homeML !== null) {
-          const vegasProb = homeML > 0 ? 100/(homeML+100) : Math.          const vegasProb = home0);
-          oddsMap[home+'_'+away] = { vega          oddsMap[home+'_'+away] = { vega          oddsMap[home+'as        read, homeML };
-        }
-      });
-    } catch(e) {}
-  }));
-  return oddsMap;
-}
-
 async function loadAllGames() {
   document.getElementById('games-container').innerHTML =
     '<div class="empty-state"><div class="spinner" style="width:20px;height:20px;margin:0 auto 12px;border-width:2px"></div><div style="margin-top:8px">Loading today\'s schedule...</div></div>';
@@ -1292,7 +1247,6 @@ async function loadAllGames() {
   document.getElementById('today-date').textContent =
     today.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}).toUpperCase();
   allGames = [];
-  const oddsMap = await fetchOdds();
 
   // NBA
   try {
@@ -1304,7 +1258,6 @@ async function loadAllGames() {
       homeAbbr:g.home_team.abbreviation, awayAbbr:g.visitor_team.abbreviation,
       time:formatTime(g.status), spread:null, vegasProb:null, modelProb:null
     }));
-  allGames.forEach(g => { const o=oddsMap[g.homeTeam+'_'+g.awayTeam]; if(o){g.vegasProb=o.vegasProb;g.spread=o.spread;} });
   } catch(e) {}
 
   // ESPN sports
@@ -1331,13 +1284,11 @@ async function loadAllGames() {
             vegasProb = 1/(1+Math.pow(10, spread/14));
           }
         }
-        const gameKey = (home?.team?.displayName||'Home')+'_'+(away?.team?.displayName||'Away');
-        const oddsData = oddsMap[gameKey] || {};
         allGames.push({
           id:key+'_'+e.id, sport:key,
           homeTeam:home?.team?.displayName||'Home', awayTeam:away?.team?.displayName||'Away',
           homeAbbr:home?.team?.abbreviation||'', awayAbbr:away?.team?.abbreviation||'',
-          time:formatTime(e.status?.type?.shortDetail||''), spread:oddsData.spread||spread, vegasProb:oddsData.vegasProb||vegasProb, modelProb:null
+          time:formatTime(e.status?.type?.shortDetail||''), spread, vegasProb, modelProb:null
         });
       });
     } catch(e) {}
@@ -1502,14 +1453,14 @@ Model prediction: Home wins ${mp}% | Vegas implied: ${vp}% | Edge: ${edge>0?'+':
 Search for current injury reports, lineup news, recent form for both teams.
 Give a concise 3-4 sentence betting analysis. Focus on whether the model edge is supported by news.`;
   try {
-    const r = await fetch('https://nba-win-predictor-airk.onrender.com/claude',{
+    const r = await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json','x-api-key':anthropicKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:400,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})
     });
     const d = await r.json();
     const text = (d.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
-    el.style.color="var(--text2)"; el.innerHTML=renderMd(text||"Analysis unavailable.");
+    el.style.color='var(--text2)'; el.textContent=text||'Analysis unavailable.';
   } catch(e) { el.style.color='var(--red)'; el.textContent='Error: '+e.message; }
 }
 
@@ -1623,14 +1574,14 @@ Search for:
 Provide a thorough 5-6 sentence analysis covering the key factors that will determine the outcome and whether this is a good betting opportunity.`;
 
   try {
-    const r = await fetch('https://nba-win-predictor-airk.onrender.com/claude',{
+    const r = await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json','x-api-key':anthropicKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:700,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})
     });
     const d = await r.json();
     const text = (d.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
-    el.style.color="var(--text2)"; el.innerHTML=renderMd(text||"Analysis unavailable.");
+    el.style.color='var(--text2)'; el.textContent=text||'Analysis unavailable.';
   } catch(e) { el.style.color='var(--red)'; el.textContent='Error: '+e.message; }
   btn.disabled=false; btn.textContent='Generate Report';
 }
@@ -1661,14 +1612,14 @@ ${gamesCtx}
 
 Always search for current injury reports when analyzing specific games. Be specific, cite current news, and be honest about uncertainty.`;
   try {
-    const r = await fetch('https://nba-win-predictor-airk.onrender.com/claude',{
+    const r = await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json','x-api-key':anthropicKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,system:sys,tools:[{type:'web_search_20250305',name:'web_search'}],messages:chatHistory})
     });
     const d = await r.json();
     const text=(d.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
-    thinking.querySelector('.chat-msg-bubble').innerHTML=renderMd(text||'No response.');
+    thinking.querySelector('.chat-msg-bubble').textContent=text||'No response.';
     chatHistory.push({role:'assistant',content:text});
   } catch(e) { thinking.querySelector('.chat-msg-bubble').textContent='Error: '+e.message; }
   btn.disabled=false;
