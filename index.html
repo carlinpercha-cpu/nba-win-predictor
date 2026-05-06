@@ -913,11 +913,11 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
         <span class="sport-row-count" id="cnt-nhl">0</span>
       </div>
       <div class="sport-row" onclick="filterSport('ncaab')" data-sport="ncaab">
-        <div class="sport-row-left"><span class="sport-row-icon">🎓</span><span class="sport-row-name">NCAAB</span></div>
+        <div class="sport-row-left"><span class="sport-row-icon">🎓</span><span class="sport-row-name">College Basketball</span></div>
         <span class="sport-row-count" id="cnt-ncaab">0</span>
       </div>
       <div class="sport-row" onclick="filterSport('cfb')" data-sport="cfb">
-        <div class="sport-row-left"><span class="sport-row-icon">🏟️</span><span class="sport-row-name">CFB</span></div>
+        <div class="sport-row-left"><span class="sport-row-icon">🏟️</span><span class="sport-row-name">College Football</span></div>
         <span class="sport-row-count" id="cnt-cfb">0</span>
       </div>
 
@@ -1255,6 +1255,18 @@ function showPage(p) {
 }
 
 // ---- LOAD GAMES ----
+function formatTime(t) {
+  if (!t) return 'TBD';
+  // Convert ISO date string to readable time
+  if (t.includes('T') && t.includes('Z')) {
+    try {
+      const d = new Date(t);
+      return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'America/New_York'}) + ' ET';
+    } catch { return t; }
+  }
+  return t;
+}
+
 async function loadAllGames() {
   document.getElementById('games-container').innerHTML =
     '<div class="empty-state"><div class="spinner" style="width:20px;height:20px;margin:0 auto 12px;border-width:2px"></div><div style="margin-top:8px">Loading today\'s schedule...</div></div>';
@@ -1304,7 +1316,7 @@ async function loadAllGames() {
           id:key+'_'+e.id, sport:key,
           homeTeam:home?.team?.displayName||'Home', awayTeam:away?.team?.displayName||'Away',
           homeAbbr:home?.team?.abbreviation||'', awayAbbr:away?.team?.abbreviation||'',
-          time:e.status?.type?.shortDetail||'', spread, vegasProb, modelProb:null
+          time:formatTime(e.status?.type?.shortDetail||''), spread, vegasProb, modelProb:null
         });
       });
     } catch(e) {}
@@ -1329,16 +1341,14 @@ async function runPredictions() {
 
 function buildPayload(g) {
   const p = { sport: g.sport, is_home: 1 };
-  if (g.vegasProb !== null) {
-    const v = g.vegasProb;
-    const s = g.spread || 0;
-    if (g.sport==='nba') Object.assign(p,{Vegas_WinProb:v,OPP_Vegas_WinProb:1-v,Vegas_WinProb_Edge:v-.5,Vegas_Favored:v>.5?1:0,Vegas_Spread:s});
-    else if (g.sport==='nfl') Object.assign(p,{vegas_home_prob:v,vegas_spread_team:s});
-    else if (g.sport==='mlb') Object.assign(p,{vegas_prob:v});
-    else if (g.sport==='ncaab') Object.assign(p,{BARTHAG:v,opp_BARTHAG:1-v,diff_BARTHAG:v-(1-v),ADJNETRTG:10*(v-.5)*2,opp_ADJNETRTG:-10*(v-.5)*2});
-    else if (g.sport==='cfb') Object.assign(p,{team_spread:s,elo_win_prob:v,elo_diff:s*-30});
-    else if (g.sport==='nhl') Object.assign(p,{pre_game_point_pct:.5+((v-.5)*.3),opp_point_pct:.5-((v-.5)*.3),point_pct_diff:(v-.5)*.6});
-  }
+  const v = (g.vegasProb !== null && !isNaN(g.vegasProb)) ? g.vegasProb : 0.55;
+  const s = (g.spread !== null && !isNaN(g.spread)) ? g.spread : -3;
+  if (g.sport==='nba') Object.assign(p,{Vegas_WinProb:v,OPP_Vegas_WinProb:1-v,Vegas_WinProb_Edge:v-.5,Vegas_Favored:v>.5?1:0,Vegas_Spread:s,Last_5_WinRate:0.5,Last_10_WinRate:0.5});
+  else if (g.sport==='nfl') Object.assign(p,{vegas_home_prob:v,vegas_spread_team:s,last5_winrate:0.5,last5_total_epa:0});
+  else if (g.sport==='mlb') Object.assign(p,{vegas_prob:v,last10_winrate:0.5,rolling_starter_ERA:4.0,opp_rolling_ERA:4.0});
+  else if (g.sport==='ncaab') Object.assign(p,{BARTHAG:v,opp_BARTHAG:1-v,diff_BARTHAG:v-(1-v),ADJNETRTG:(v-.5)*20,opp_ADJNETRTG:-(v-.5)*20,last5_winrate:0.5});
+  else if (g.sport==='cfb') Object.assign(p,{team_spread:s,elo_win_prob:v,elo_diff:s*-30,team_sp:s*-2,opp_sp:s*2,sp_diff:s*-4,last3_win:0.5});
+  else if (g.sport==='nhl') Object.assign(p,{pre_game_point_pct:.5+((v-.5)*.3),opp_point_pct:.5-((v-.5)*.3),point_pct_diff:(v-.5)*.6,last5_winrate:0.5,last5_goals_for:3.0,last5_goals_against:3.0});
   return p;
 }
 
@@ -1356,7 +1366,7 @@ function filterSport(sport) {
   renderGames();
 }
 
-const SPORT_LABELS = {nba:'🏀 NBA',nfl:'🏈 NFL',mlb:'⚾ MLB',nhl:'🏒 NHL',ncaab:'🎓 NCAAB',cfb:'🏟️ CFB'};
+const SPORT_LABELS = {nba:'🏀 NBA',nfl:'🏈 NFL',mlb:'⚾ MLB',nhl:'🏒 NHL',ncaab:'🎓 College Basketball',cfb:'🏟️ College Football'};
 const MODEL_AUC = {nba:0.727,nfl:0.710,mlb:0.653,ncaab:0.862,cfb:0.867,nhl:0.749};
 const HOME_ADV = {nba:'58.8%',nfl:'53.3%',mlb:'54.4%',ncaab:'74.3%',cfb:'57.9%',nhl:'53.6%'};
 
