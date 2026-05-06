@@ -1279,12 +1279,16 @@ async function loadAllGames() {
   try {
     const r = await fetch(`https://api.balldontlie.io/v1/games?dates[]=${dateStr}&per_page=50`, { headers:{'Authorization':BDL_KEY} });
     const d = await r.json();
-    (d.data||[]).forEach(g => allGames.push({
-      id:'nba_'+g.id, sport:'nba',
-      homeTeam:g.home_team.full_name, awayTeam:g.visitor_team.full_name,
-      homeAbbr:g.home_team.abbreviation, awayAbbr:g.visitor_team.abbreviation,
-      time:formatTime(g.status), spread:null, vegasProb:null, modelProb:null
-    }));
+   (d.data||[]).forEach(g => {
+      const ht=g.home_team.full_name, at=g.visitor_team.full_name;
+      const od=oddsMap[ht+'|'+at]||{};
+      allGames.push({
+        id:'nba_'+g.id, sport:'nba',
+        homeTeam:ht, awayTeam:at,
+        homeAbbr:g.home_team.abbreviation, awayAbbr:g.visitor_team.abbreviation,
+        time:formatTime(g.status), spread:od.spread||null, vegasProb:od.vegasProb||null, modelProb:null
+      });
+    });
   } catch(e) {}
 
   // ESPN sports
