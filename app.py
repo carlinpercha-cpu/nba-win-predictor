@@ -4,12 +4,57 @@ import joblib
 import numpy as np
 import os
 import requests
+import json
+from datetime import datetime
+import google.auth
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
 
 app = Flask(__name__)
 CORS(app)
 
 MODEL_DIR = os.path.join(os.path.dirname(__file__), 'models')
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+GOOGLE_SHEETS_ID = os.environ.get('GOOGLE_SHEETS_ID', '')
+GOOGLE_SERVICE_ACCOUNT = os.environ.get('GOOGLE_SERVICE_ACCOUNT', '')
+
+# Google Sheets setup
+sheets_service = None
+try:
+    if GOOGLE_SERVICE_ACCOUNT:
+        creds_dict = json.loads(GOOGLE_SERVICE_ACCOUNT)
+        creds = service_account.Credentials.from_service_account_info(
+            creds_dict,
+            scopes=['https://www.googleapis.com/auth/spreadsheets']
+        )
+        sheets_service = build('sheets', 'v4', credentials=creds)
+        print("Google Sheets connected")
+except Exception as e:
+    print(f"Google Sheets failed: {e}")
+
+def log_prediction(sport, home_team, away_team, home_prob, away_prob, game_id):
+    if not sheets_service or not GOOGLE_SHEETS_ID:
+        return
+    try:
+        row = [
+            datetime.utcnow().strftime('%Y-%m-%d'),
+            sport.upper(),
+            home_team,
+            away_team,
+            round(home_prob * 100, 1),
+            round(away_prob * 100, 1),
+            'home' if home_prob > 0.5 else 'away',
+            game_id,
+            'pending'  # result updated later
+        ]
+        sheets_service.spreadsheets().values().append(
+            spreadsheetId=GOOGLE_SHEETS_ID,
+            range='Sheet1!A:I',
+            valueInputOption='RAW',
+            body={'values': [row]}
+        ).execute()
+    except Exception as e:
+        print(f"Sheets log error: {e}")
 
 def load_model(sport):
     model    = joblib.load(os.path.join(MODEL_DIR, f'{sport}_model.pkl'))
@@ -17,7 +62,6 @@ def load_model(sport):
     features = joblib.load(os.path.join(MODEL_DIR, f'{sport}_features.pkl'))
     return model, scaler, features
 
-# Load all models at startup
 print("Loading models...")
 models = {}
 for sport in ['nba', 'nfl', 'mlb', 'ncaab', 'ncaab_bracket', 'cfb', 'nhl']:
@@ -33,10 +77,11 @@ def health():
     return jsonify({
         'status': 'ok',
         'models_loaded': list(models.keys()),
+        'sheets_connected': sheets_service is not None,
         'model_performance': {
             'nba':          {'auc': 0.727, 'accuracy': 0.665},
             'nfl':          {'auc': 0.710, 'accuracy': 0.660},
-            'mlb':          {'auc': 0.617, 'accuracy': 0.592},
+            'mlb':          {'auc': 0.617, 'accuracy': 0.581},
             'ncaab':        {'auc': 0.862, 'accuracy': 0.774},
             'ncaab_bracket':{'auc': 0.927, 'accuracy': 0.839},
             'cfb':          {'auc': 0.867, 'accuracy': 0.776},
@@ -68,6 +113,13 @@ def predict():
         X_scaled = scaler.transform(X)
         prob = model.predict_proba(X_scaled)[0][1]
 
+        # Log prediction if game_id provided
+        game_id = data.get('game_id', '')
+        home_team = data.get('home_team', '')
+        away_team = data.get('away_team', '')
+        if game_id and home_team and away_team:
+            log_prediction(sport, home_team, away_team, float(prob), 1-float(prob), game_id)
+
         return jsonify({
             'sport': sport,
             'win_probability': round(float(prob), 4),
@@ -83,7 +135,6 @@ def predict():
 def claude_proxy():
     if not ANTHROPIC_API_KEY:
         return jsonify({'error': 'API key not configured'}), 500
-
     try:
         body = request.get_json()
         response = requests.post(
@@ -97,7 +148,42 @@ def claude_proxy():
             timeout=60
         )
         return jsonify(response.json()), response.status_code
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
+@app.route('/record', methods=['GET'])
+def get_record():
+    if not sheets_service or not GOOGLE_SHEETS_ID:
+        return jsonify({'error': 'Sheets not configured'}), 500
+    try:
+        result = sheets_service.spreadsheets().values().get(
+            spreadsheetId=GOOGLE_SHEETS_ID,
+            range='Sheet1!A:I'
+        ).execute()
+        rows = result.get('values', [])
+        predictions = []
+        for row in rows:
+            if len(row) >= 9:
+                predictions.append({
+                    'date': row[0],
+                    'sport': row[1],
+                    'home_team': row[2],
+                    'away_team': row[3],
+                    'home_prob': row[4],
+                    'away_prob': row[5],
+                    'prediction': row[6],
+                    'game_id': row[7],
+                    'result': row[8]
+                })
+        correct = sum(1 for p in predictions if p['result'] == p['prediction'])
+        total_decided = sum(1 for p in predictions if p['result'] != 'pending')
+        return jsonify({
+            'predictions': predictions,
+            'total': len(predictions),
+            'decided': total_decided,
+            'correct': correct,
+            'accuracy': round(correct/total_decided*100, 1) if total_decided > 0 else None
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
