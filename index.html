@@ -1168,35 +1168,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
       </div>
     </div>
 
-    <!-- NBA V1 vs V2 comparison -->
-    <div class="about-card" style="margin-top:20px;">
-      <div class="about-card-title">🏀 NBA Model Version History</div>
-      <div class="compare-row">
-        <div class="compare-cell header">Metric</div>
-        <div class="compare-cell header">V1 (Azure ML)</div>
-        <div class="compare-cell header">V2 (Four Factors + Vegas)</div>
-      </div>
-      <div class="compare-row">
-        <div class="compare-cell" style="color:var(--text3)">AUC</div>
-        <div class="compare-cell">0.661</div>
-        <div class="compare-cell green">0.723 (+0.062)</div>
-      </div>
-      <div class="compare-row">
-        <div class="compare-cell" style="color:var(--text3)">Accuracy</div>
-        <div class="compare-cell">61.6%</div>
-        <div class="compare-cell green">67.8% (+6.2%)</div>
-      </div>
-      <div class="compare-row">
-        <div class="compare-cell" style="color:var(--text3)">Training Games</div>
-        <div class="compare-cell">~24,000</div>
-        <div class="compare-cell green">30,393</div>
-      </div>
-      <div class="compare-row">
-        <div class="compare-cell" style="color:var(--text3)">Key Addition</div>
-        <div class="compare-cell">Raw box scores only</div>
-        <div class="compare-cell green">Four Factors + Vegas lines</div>
-      </div>
-    </div>
+
   </div>
 </div>
 
@@ -1284,7 +1256,7 @@ async function loadAllGames() {
       id:'nba_'+g.id, sport:'nba',
       homeTeam:g.home_team.full_name, awayTeam:g.visitor_team.full_name,
       homeAbbr:g.home_team.abbreviation, awayAbbr:g.visitor_team.abbreviation,
-      time:g.status, spread:null, vegasProb:null, modelProb:null
+      time:formatTime(g.status), spread:null, vegasProb:null, modelProb:null
     }));
   } catch(e) {}
 
@@ -1334,8 +1306,12 @@ async function runPredictions() {
       const payload = buildPayload(g);
       const r = await fetch(API+'/predict',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
       const d = await r.json();
-      g.modelProb = d.win_probability;
-    } catch {}
+      if (d && typeof d.win_probability === 'number' && !isNaN(d.win_probability)) {
+        g.modelProb = d.win_probability;
+      } else {
+        g.modelProb = null;
+      }
+    } catch(e) { g.modelProb = null; }
   }));
 }
 
@@ -1382,7 +1358,7 @@ function renderGames() {
   for (const [sport, games] of Object.entries(bySport)) {
     html += `<div class="sport-section"><div class="sport-section-header"><span>${SPORT_LABELS[sport]||sport}</span><span class="sport-section-label" style="margin-left:4px">· ${games.length} game${games.length!==1?'s':''}</span></div>`;
     games.forEach(g => {
-      const mp = g.modelProb!==null ? Math.round(g.modelProb*100) : null;
+      const mp = (g.modelProb!==null && g.modelProb!==undefined && !isNaN(g.modelProb)) ? Math.round(g.modelProb*100) : null;
       const vp = g.vegasProb!==null ? Math.round(g.vegasProb*100) : null;
       const edge = mp!==null && vp!==null ? mp-vp : null;
       const hasEdge = Math.abs(edge||0) >= 5;
@@ -1398,10 +1374,10 @@ function renderGames() {
         <div class="game-card-inner">
           <div class="game-teams-col">
             <div class="game-matchup">${g.awayAbbr||g.awayTeam} <span class="at">@</span> ${g.homeAbbr||g.homeTeam}</div>
-            <div class="game-meta-row"><span>${sport.toUpperCase()}</span><span>${g.time||'TBD'}</span></div>
+            <div class="game-meta-row"><span>${sport.toUpperCase()}</span></div>
           </div>
           <div class="game-time-col">
-            <div class="game-time-val">${g.time||'—'}</div>
+            <div class="game-time-val">${g.time&&g.time!=='TBD'?g.time:'TBD'}</div>
             <div class="game-time-label">Time</div>
           </div>
           <div class="vegas-col">
