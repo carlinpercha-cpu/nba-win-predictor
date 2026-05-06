@@ -1175,6 +1175,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
 <script>
 const API = 'https://nba-win-predictor-airk.onrender.com';
 const BDL_KEY = '0a853bd2-7b7d-48f8-9bb4-aa7f6e74a613';
+const ODDS_KEY = '465c281c797b25ab75b326e3e0828a9f';
 
 function renderMd(t) {
   if (!t) return '';
@@ -1252,6 +1253,37 @@ function formatTime(t) {
   return t;
 }
 
+
+// ---- ODDS API ----
+async function fetchOdds() {
+  const oddsMap = {};
+  const sports = [
+    ['baseball_mlb','mlb'],
+    ['basketball_nba','nba'],
+    ['americanfootball_nfl','nfl'],
+    ['icehockey_nhl','nhl'],
+    ['basketball_ncaab','ncaab'],
+    ['americanfootball_ncaaf','cfb'],
+  ];
+  await Promise.allSettled(sports.map(async ([apiSport, key]) => {
+    try {
+      const r = await fetch(`https://api.the-odds-api.com/v4/sports/${apiSport}/odds/?apiKey=${ODDS_KEY}&regions=us&markets=h2h,spreads&oddsFormat=american`);
+      const games = await r.json();
+      (games||[]).forEach(g => {
+        const home = g.home_team;
+        const away = g.away_team;
+        let homeML = null, spread = null;
+        (g.bookmakers||[]).slice(0,1).forEach(bk         (g.bookmakers||[]s|        (g.bookmakers||[]).slice(0,1).forEach(bk         (g.b          (g.bookmakers||[]).slice(0,1).forEach(bk         (g.bookmakers||[]s|        (g.bookmakers||[]).slice(0,1).             (g.bookmakers||[]).slice(0,1).forEa          (g.b = mkt.outcomes.find(o=>        (g.bookmakers||[]).   if (ho) spread = ho.p        (g.bookma }        (g.bookmakers||[])
+        if (homeML !== null) {
+          const vegasProb = homeML > 0 ? 100/(homeML+100) : Math.          const vegasProb = home0);
+          oddsMap[home+'_'+away] = { vega          oddsMap[home+'_'+away] = { vega          oddsMap[home+'as        read, homeML };
+        }
+      });
+    } catch(e) {}
+  }));
+  return oddsMap;
+}
+
 async function loadAllGames() {
   document.getElementById('games-container').innerHTML =
     '<div class="empty-state"><div class="spinner" style="width:20px;height:20px;margin:0 auto 12px;border-width:2px"></div><div style="margin-top:8px">Loading today\'s schedule...</div></div>';
@@ -1260,6 +1292,7 @@ async function loadAllGames() {
   document.getElementById('today-date').textContent =
     today.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}).toUpperCase();
   allGames = [];
+  const oddsMap = await fetchOdds();
 
   // NBA
   try {
@@ -1271,6 +1304,7 @@ async function loadAllGames() {
       homeAbbr:g.home_team.abbreviation, awayAbbr:g.visitor_team.abbreviation,
       time:formatTime(g.status), spread:null, vegasProb:null, modelProb:null
     }));
+  allGames.forEach(g => { const o=oddsMap[g.homeTeam+'_'+g.awayTeam]; if(o){g.vegasProb=o.vegasProb;g.spread=o.spread;} });
   } catch(e) {}
 
   // ESPN sports
@@ -1297,11 +1331,13 @@ async function loadAllGames() {
             vegasProb = 1/(1+Math.pow(10, spread/14));
           }
         }
+        const gameKey = (home?.team?.displayName||'Home')+'_'+(away?.team?.displayName||'Away');
+        const oddsData = oddsMap[gameKey] || {};
         allGames.push({
           id:key+'_'+e.id, sport:key,
           homeTeam:home?.team?.displayName||'Home', awayTeam:away?.team?.displayName||'Away',
           homeAbbr:home?.team?.abbreviation||'', awayAbbr:away?.team?.abbreviation||'',
-          time:formatTime(e.status?.type?.shortDetail||''), spread, vegasProb, modelProb:null
+          time:formatTime(e.status?.type?.shortDetail||''), spread:oddsData.spread||spread, vegasProb:oddsData.vegasProb||vegasProb, modelProb:null
         });
       });
     } catch(e) {}
