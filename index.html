@@ -1175,6 +1175,21 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
 <script>
 const API = 'https://nba-win-predictor-airk.onrender.com';
 const BDL_KEY = '0a853bd2-7b7d-48f8-9bb4-aa7f6e74a613';
+
+function renderMd(t) {
+  return t
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/### (.+)/g,'<strong style="font-size:13px;color:var(--green)"></strong>')
+    .replace(/## (.+)/g,'<strong style="font-size:14px;color:var(--green)"></strong>')
+    .replace(/# (.+)/g,'<strong style="font-size:15px;color:var(--green)"></strong>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong></strong>')
+    .replace(/\*(.+?)\*/g,'<em></em>')
+    .replace(/
+
+/g,'<br><br>')
+    .replace(/
+/g,'<br>');
+}
 let anthropicKey = localStorage.getItem('edge_api_key') || '';
 let allGames = [];
 let currentFilter = 'all';
@@ -1460,7 +1475,7 @@ Give a concise 3-4 sentence betting analysis. Focus on whether the model edge is
     });
     const d = await r.json();
     const text = (d.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
-    el.style.color='var(--text2)'; el.textContent=text||'Analysis unavailable.';
+    el.style.color="var(--text2)"; el.innerHTML=renderMd(text||"Analysis unavailable.");
   } catch(e) { el.style.color='var(--red)'; el.textContent='Error: '+e.message; }
 }
 
@@ -1581,7 +1596,7 @@ Provide a thorough 5-6 sentence analysis covering the key factors that will dete
     });
     const d = await r.json();
     const text = (d.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
-    el.style.color='var(--text2)'; el.textContent=text||'Analysis unavailable.';
+    el.style.color="var(--text2)"; el.innerHTML=renderMd(text||"Analysis unavailable.");
   } catch(e) { el.style.color='var(--red)'; el.textContent='Error: '+e.message; }
   btn.disabled=false; btn.textContent='Generate Report';
 }
@@ -1619,7 +1634,7 @@ Always search for current injury reports when analyzing specific games. Be speci
     });
     const d = await r.json();
     const text=(d.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
-    thinking.querySelector('.chat-msg-bubble').textContent=text||'No response.';
+    thinking.querySelector('.chat-msg-bubble').innerHTML=renderMd(text||'No response.');
     chatHistory.push({role:'assistant',content:text});
   } catch(e) { thinking.querySelector('.chat-msg-bubble').textContent='Error: '+e.message; }
   btn.disabled=false;
