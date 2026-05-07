@@ -1395,7 +1395,7 @@ async function loadAllGames() {
         id:'nba_'+g.id, sport:'nba',
         homeTeam:ht, awayTeam:at,
         homeAbbr:g.home_team.abbreviation, awayAbbr:g.visitor_team.abbreviation,
-        time:formatTime(g.status), spread:od.spread||null, vegasProb:od.vegasProb||null, modelProb:null
+        time:formatTime(g.status), spread:od.spread||null, vegasProb:od.vegasProb||null, modelProb:null,
         homeScore: g.home_team_score||null,
         awayScore: g.visitor_team_score||null,
       });
