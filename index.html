@@ -882,6 +882,9 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
   <div class="nav-item" onclick="showPage('chat')" id="tab-chat">
     Analyst Chat
   </div>
+  <div class="nav-item" onclick="showPage('record')" id="tab-record">
+    Model Record
+  </div>
   <div class="nav-item" onclick="showPage('about')" id="tab-about">
     About the Models
   </div>
@@ -1068,6 +1071,28 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
   </div>
 </div>
 
+<!-- ===== RECORD PAGE ===== -->
+<div class="page" id="page-record">
+  <div class="about-wrap">
+    <div class="page-header" style="margin-bottom:24px;">
+      <div>
+        <div class="page-title">Model Record</div>
+        <div class="page-subtitle">Live tracking of every prediction · Updated daily</div>
+      </div>
+      <button class="refresh-btn" onclick="loadRecord()">↻ Refresh</button>
+    </div>
+    <div id="record-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
+      <div class="sport-perf-card"><div class="sport-perf-sport">Total Predictions</div><div class="sport-perf-auc" id="rec-total">—</div></div>
+      <div class="sport-perf-card"><div class="sport-perf-sport">Decided</div><div class="sport-perf-auc" id="rec-decided">—</div></div>
+      <div class="sport-perf-card"><div class="sport-perf-sport">Correct</div><div class="sport-perf-auc" id="rec-correct">—</div></div>
+      <div class="sport-perf-card"><div class="sport-perf-sport">Accuracy</div><div class="sport-perf-auc" id="rec-acc">—</div></div>
+    </div>
+    <div id="record-table" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;overflow-x:auto;">
+      <div class="empty-state">Loading record...</div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== ABOUT PAGE ===== -->
 <div class="page" id="page-about">
   <div class="about-wrap">
@@ -1236,6 +1261,7 @@ function showPage(p) {
   document.querySelectorAll('.nav-item').forEach(x => x.classList.remove('active'));
   document.getElementById('page-' + p).classList.add('active');
   document.getElementById('tab-' + p).classList.add('active');
+  if (p === 'record') loadRecord();
 }
 
 // ---- LOAD GAMES ----
@@ -1298,6 +1324,8 @@ async function loadAllGames() {
         homeTeam:ht, awayTeam:at,
         homeAbbr:g.home_team.abbreviation, awayAbbr:g.visitor_team.abbreviation,
         time:formatTime(g.status), spread:od.spread||null, vegasProb:od.vegasProb||null, modelProb:null
+        homeScore: g.home_team_score||null,
+        awayScore: g.visitor_team_score||null,
       });
     });
   } catch(e) {}
@@ -1333,6 +1361,8 @@ async function loadAllGames() {
           homeTeam:ht, awayTeam:at,
           homeAbbr:home?.team?.abbreviation||'', awayAbbr:away?.team?.abbreviation||'',
           time:formatTime(e.status?.type?.shortDetail||''), spread:od.spread||spread, vegasProb:od.vegasProb||vegasProb, modelProb:null
+          homeScore: parseInt(home?.score)||null,
+          awayScore: parseInt(away?.score)||null,
         });
       });
     } catch(e) {}
@@ -1451,12 +1481,17 @@ function renderGames() {
 function buildExpanded(g, edge) {
   const mp = g.modelProb!==null?Math.round(g.modelProb*100):null;
   const vp = g.vegasProb!==null?Math.round(g.vegasProb*100):null;
+  const isLive = g.time && !g.time.includes('PM') && !g.time.includes('AM') && g.time !== 'TBD' && g.time !== 'Final';
+  const isFinal = g.time === 'Final' || g.time?.includes('Final');
+  const scoreDisplay = (g.homeScore !== null && g.awayScore !== null) ? 
+    `<div style="font-size:11px;color:var(--text2);margin-top:4px">${g.awayAbbr||g.awayTeam} ${g.awayScore} — ${g.homeScore} ${g.homeAbbr||g.homeTeam} ${isLive?'<span style="color:var(--green);font-weight:600">● LIVE</span>':isFinal?'<span style="color:var(--text3)">FINAL</span>':''}</div>` : '';
   return `<div class="expanded-cols">
     <div>
       <div class="exp-section-title">Matchup</div>
       <div class="exp-row"><span class="exp-key">Home</span><span class="exp-val">${g.homeTeam}</span></div>
       <div class="exp-row"><span class="exp-key">Away</span><span class="exp-val">${g.awayTeam}</span></div>
       <div class="exp-row"><span class="exp-key">Sport</span><span class="exp-val">${g.sport.toUpperCase()}</span></div>
+      ${g.homeScore!==null?`<div class="exp-row"><span class="exp-key">Score</span><span class="exp-val">${g.awayScore}–${g.homeScore} ${isLive?'<span style="color:var(--green)">● LIVE</span>':isFinal?'FINAL':''}</span></div>`:''}
     </div>
     <div>
       <div class="exp-section-title">Odds vs Model</div>
@@ -1673,6 +1708,31 @@ function addMsg(role, html) {
   d.innerHTML=`<div class="chat-msg-label">${role==='user'?'You':'EDGE Analyst'}</div><div class="chat-msg-bubble">${html}</div>`;
   c.appendChild(d); c.scrollTop=c.scrollHeight;
   return d;
+}
+
+async function loadRecord() {
+  const tbl = document.getElementById('record-table');
+  tbl.innerHTML = '<div class="empty-state"><div class="spinner"></div> Loading...</div>';
+  try {
+    const r = await fetch(API + '/record');
+    const d = await r.json();
+    document.getElementById('rec-total').textContent = d.total || 0;
+    document.getElementById('rec-decided').textContent = d.decided || 0;
+    document.getElementById('rec-correct').textContent = d.correct || 0;
+    document.getElementById('rec-acc').textContent = d.accuracy !== null ? d.accuracy + '%' : '—';
+    const preds = (d.predictions || []).reverse();
+    if (!preds.length) { tbl.innerHTML = '<div class="empty-state">No predictions logged yet</div>'; return; }
+    let html = '<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="border-bottom:1px solid var(--border);color:var(--text3);text-align:left;"><th style="padding:8px">Date</th><th style="padding:8px">Sport</th><th style="padding:8px">Matchup</th><th style="padding:8px">Pick</th><th style="padding:8px">Confidence</th><th style="padding:8px">Result</th></tr></thead><tbody>';
+    preds.forEach(p => {
+      const conf = Math.max(parseFloat(p.home_prob), parseFloat(p.away_prob));
+      let resultBadge = '<span style="color:var(--text3)">Pending</span>';
+      if (p.result === p.prediction) resultBadge = '<span style="color:var(--green);font-weight:600">✓ Correct</span>';
+      else if (p.result !== 'pending') resultBadge = '<span style="color:var(--red);font-weight:600">✗ Wrong</span>';
+      html += `<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px;color:var(--text2)">${p.date}</td><td style="padding:8px;color:var(--text2)">${p.sport}</td><td style="padding:8px">${p.away_team} @ ${p.home_team}</td><td style="padding:8px;text-transform:capitalize">${p.prediction}</td><td style="padding:8px;color:var(--green)">${conf}%</td><td style="padding:8px">${resultBadge}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    tbl.innerHTML = html;
+  } catch(e) { tbl.innerHTML = '<div class="empty-state">Error loading record</div>'; }
 }
 
 function updateChatCtx() {
