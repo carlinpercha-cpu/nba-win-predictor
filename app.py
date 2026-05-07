@@ -302,7 +302,7 @@ def fetch_nba_team_stats():
         debug_info['teams_found'] = len(teams)
 
         team_stats = []
-        for team_wrapper in teams[:3]:  # Test on first 3 teams only
+        for team_wrapper in teams:
             team = team_wrapper.get('team', {})
             team_id = team.get('id')
             team_name = team.get('displayName')
