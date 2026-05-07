@@ -1395,7 +1395,7 @@ function buildPayload(g) {
   const s = (g.spread !== null && !isNaN(g.spread)) ? g.spread : -3;
   if (g.sport==='nba') Object.assign(p,{Vegas_WinProb:v,OPP_Vegas_WinProb:1-v,Vegas_WinProb_Edge:v-.5,Vegas_Favored:v>.5?1:0,Vegas_Spread:s,Last_5_WinRate:0.5,Last_10_WinRate:0.5});
   else if (g.sport==='nfl') Object.assign(p,{vegas_home_prob:v,vegas_spread_team:s,last5_winrate:0.5,last5_total_epa:0});
-  else if (g.sport==='mlb') Object.assign(p,{vegas_prob:v,last10_winrate:0.5,rolling_starter_ERA:4.0,opp_rolling_ERA:4.0});
+  else if (g.sport==='mlb') Object.assign(p,{vegas_prob:v,over_under:9.0,temperature:75,wind_speed:8,wind_out:0,rolling_ERA:4.0,rolling_GSc:50,rolling_FIP:4.2,opp_rolling_ERA:4.0,opp_rolling_GSc:50,opp_rolling_FIP:4.2,last5_run_diff:0,last10_run_diff:0,last5_win:0.5,win_streak_fixed:0});
   else if (g.sport==='ncaab') Object.assign(p,{BARTHAG:v,opp_BARTHAG:1-v,diff_BARTHAG:v-(1-v),ADJNETRTG:(v-.5)*20,opp_ADJNETRTG:-(v-.5)*20,last5_winrate:0.5});
   else if (g.sport==='cfb') Object.assign(p,{team_spread:s,elo_win_prob:v,elo_diff:s*-30,team_sp:s*-2,opp_sp:s*2,sp_diff:s*-4,last3_win:0.5});
   else if (g.sport==='nhl') Object.assign(p,{pre_game_point_pct:.5+((v-.5)*.3),opp_point_pct:.5-((v-.5)*.3),point_pct_diff:(v-.5)*.6,last5_winrate:0.5,last5_goals_for:3.0,last5_goals_against:3.0});
