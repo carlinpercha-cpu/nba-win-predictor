@@ -288,6 +288,29 @@ def refresh_stats():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/team_stats', methods=['GET'])
+def get_team_stats():
+    if not sheets_service or not GOOGLE_SHEETS_ID:
+        return jsonify({'error': 'Sheets not configured'}), 500
+    try:
+        result = sheets_service.spreadsheets().values().get(
+            spreadsheetId=GOOGLE_SHEETS_ID,
+            range='TeamStats!A:F'
+        ).execute()
+        rows = result.get('values', [])
+        stats = {}
+        for row in rows[1:]:
+            if len(row) < 5:
+                continue
+            sport, team_id, team_name = row[0], row[1], row[2]
+            stats[f'{sport}|{team_name}'] = {
+                'last5_winrate': float(row[3]) if row[3] else 0.5,
+                'last10_winrate': float(row[4]) if row[4] else 0.5,
+                'games_played': int(row[5]) if len(row) > 5 and row[5] else 0,
+            }
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 def fetch_nba_team_stats():
     """Fetch last 10 games stats for each NBA team from ESPN."""
