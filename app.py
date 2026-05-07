@@ -277,10 +277,16 @@ def refresh_stats():
         results = {}
 
         # ===== NBA =====
-        nba_stats = fetch_nba_team_stats()
-        if nba_stats:
-            write_team_stats('NBA', nba_stats)
-            results['nba'] = len(nba_stats)
+        try:
+            nba_stats = fetch_nba_team_stats()
+            results['nba_count'] = len(nba_stats) if nba_stats else 0
+            if nba_stats:
+                write_team_stats('NBA', nba_stats)
+                results['nba'] = len(nba_stats)
+        except Exception as nba_err:
+            results['nba_error'] = str(nba_err)
+            import traceback
+            results['nba_trace'] = traceback.format_exc()[-500:]
 
         return jsonify({'status': 'ok', 'updated': results})
     except Exception as e:
