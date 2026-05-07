@@ -945,7 +945,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
       <div class="model-row"><span class="model-row-name">NCAAB</span><div class="model-row-right"><div class="model-auc-bar"><div class="model-auc-fill" style="width:86.2%"></div></div><span class="model-auc-val">0.862</span></div></div>
       <div class="model-row"><span class="model-row-name">NHL</span><div class="model-row-right"><div class="model-auc-bar"><div class="model-auc-fill" style="width:74.9%"></div></div><span class="model-auc-val">0.749</span></div></div>
       <div class="model-row"><span class="model-row-name">NBA</span><div class="model-row-right"><div class="model-auc-bar"><div class="model-auc-fill" style="width:72.7%"></div></div><span class="model-auc-val">0.727</span></div></div>
-      <div class="model-row"><span class="model-row-name">NFL</span><div class="model-row-right"><div class="model-auc-bar"><div class="model-auc-fill" style="width:71.0%"></div></div><span class="model-auc-val">0.710</span></div></div>
+      <div class="model-row"><span class="model-row-name">NFL</span><div class="model-row-right"><div class="model-auc-bar"><div class="model-auc-fill" style="width:78.8%"></div></div><span class="model-auc-val">0.710</span></div></div>
       <div class="model-row"><span class="model-row-name">MLB</span><div class="model-row-right"><div class="model-auc-bar"><div class="model-auc-fill" style="width:65.3%"></div></div><span class="model-auc-val">0.617</span></div></div>
 
       <div class="sidebar-divider"></div>
@@ -1190,9 +1190,9 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
       </div>
       <div class="sport-perf-card">
         <div class="sport-perf-sport">🏈 NFL Football</div>
-        <div class="sport-perf-auc">71.0%</div>
+        <div class="sport-perf-auc">78.8%</div>
         <div class="sport-perf-acc">Accuracy: 65.8% · 42 features</div>
-        <div class="sport-auc-track"><div class="sport-auc-fill" style="width:71.0%"></div></div>
+        <div class="sport-auc-track"><div class="sport-auc-fill" style="width:78.8%"></div></div>
         <div class="sport-mini-stats">
           <div class="sport-mini-stat"><div class="sport-mini-label">Training</div><div class="sport-mini-val">1,087 games</div></div>
           <div class="sport-mini-stat"><div class="sport-mini-label">Top Feature</div><div class="sport-mini-val">Vegas Spread</div></div>
@@ -1499,7 +1499,7 @@ function filterSport(sport) {
 }
 
 const SPORT_LABELS = {nba:'🏀 NBA',nfl:'🏈 NFL',mlb:'⚾ MLB',nhl:'🏒 NHL',ncaab:'🎓 College Basketball',cfb:'🏟️ College Football'};
-const MODEL_AUC = {nba:0.727,nfl:0.710,mlb:0.653,ncaab:0.862,cfb:0.867,nhl:0.749};
+const MODEL_AUC = {nba:0.727,nfl:0.788,mlb:0.653,ncaab:0.862,cfb:0.867,nhl:0.749};
 const HOME_ADV = {nba:'58.8%',nfl:'53.3%',mlb:'54.4%',ncaab:'74.3%',cfb:'57.9%',nhl:'53.6%'};
 
 function renderGames() {
