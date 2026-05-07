@@ -1369,6 +1369,11 @@ function formatTime(t) {
 }
 
 async function loadAllGames() {
+  // Fetch team stats first
+  try {
+    const tsResp = await fetch(API + '/team_stats');
+    window.teamStats = await tsResp.json();
+  } catch(e) { window.teamStats = {}; }
   document.getElementById('games-container').innerHTML =
     '<div class="empty-state"><div class="spinner" style="width:20px;height:20px;margin:0 auto 12px;border-width:2px"></div><div style="margin-top:8px">Loading today\'s schedule...</div></div>';
   const today = new Date();
@@ -1485,7 +1490,10 @@ function buildPayload(g) {
   const p = { sport: g.sport, is_home: 1, game_id: g.id, home_team: g.homeTeam, away_team: g.awayTeam };
   const v = (g.vegasProb !== null && !isNaN(g.vegasProb)) ? g.vegasProb : 0.55;
   const s = (g.spread !== null && !isNaN(g.spread)) ? g.spread : -3;
-  if (g.sport==='nba') Object.assign(p,{Vegas_WinProb:v,OPP_Vegas_WinProb:1-v,Vegas_WinProb_Edge:v-.5,Vegas_Favored:v>.5?1:0,Vegas_Spread:s,Last_5_WinRate:0.5,Last_10_WinRate:0.5});
+  if (g.sport==='nba') {
+    const homeStats = (window.teamStats||{})['NBA|'+g.homeTeam] || {last5_winrate:0.5,last10_winrate:0.5};
+    Object.assign(p,{Vegas_WinProb:v,OPP_Vegas_WinProb:1-v,Vegas_WinProb_Edge:v-.5,Vegas_Favored:v>.5?1:0,Vegas_Spread:s,Last_5_WinRate:homeStats.last5_winrate,Last_10_WinRate:homeStats.last10_winrate});
+  }
   else if (g.sport==='nfl') Object.assign(p,{vegas_home_prob:v,vegas_spread_team:s,last5_winrate:0.5,last5_total_epa:0});
   else if (g.sport==='mlb') Object.assign(p,{vegas_prob:v,over_under:9.0,temperature:75,wind_speed:8,wind_out:0,rolling_ERA:4.0,rolling_GSc:50,rolling_FIP:4.2,opp_rolling_ERA:4.0,opp_rolling_GSc:50,opp_rolling_FIP:4.2,last5_run_diff:0,last10_run_diff:0,last5_win:0.5,win_streak_fixed:0});
   else if (g.sport==='ncaab') Object.assign(p,{BARTHAG:v,opp_BARTHAG:1-v,diff_BARTHAG:v-(1-v),ADJNETRTG:(v-.5)*20,opp_ADJNETRTG:-(v-.5)*20,last5_winrate:0.5});
