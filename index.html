@@ -1494,12 +1494,25 @@ function buildPayload(g) {
     const homeStats = (window.teamStats||{})['NBA|'+g.homeTeam] || {last5_winrate:0.5,last10_winrate:0.5};
     Object.assign(p,{Vegas_WinProb:v,OPP_Vegas_WinProb:1-v,Vegas_WinProb_Edge:v-.5,Vegas_Favored:v>.5?1:0,Vegas_Spread:s,Last_5_WinRate:homeStats.last5_winrate,Last_10_WinRate:homeStats.last10_winrate});
   }
-  else if (g.sport==='nfl') Object.assign(p,{vegas_home_prob:v,vegas_spread_team:s,last5_winrate:0.5,last5_total_epa:0});
-  else if (g.sport==='mlb') Object.assign(p,{vegas_prob:v,over_under:9.0,temperature:75,wind_speed:8,wind_out:0,rolling_ERA:4.0,rolling_GSc:50,rolling_FIP:4.2,opp_rolling_ERA:4.0,opp_rolling_GSc:50,opp_rolling_FIP:4.2,last5_run_diff:0,last10_run_diff:0,last5_win:0.5,win_streak_fixed:0});
+  else if (g.sport==='nfl') {
+    const hs = (window.teamStats||{})['NFL|'+g.homeTeam] || {last5_winrate:0.5};
+    Object.assign(p,{vegas_home_prob:v,vegas_spread_team:s,last5_winrate:hs.last5_winrate,last5_total_epa:0});
+  }
+  else if (g.sport==='mlb') {
+    const hs = (window.teamStats||{})['MLB|'+g.homeTeam] || {last5_winrate:0.5,last10_winrate:0.5};
+    Object.assign(p,{vegas_prob:v,over_under:9.0,temperature:75,wind_speed:8,wind_out:0,rolling_ERA:4.0,rolling_GSc:50,rolling_FIP:4.2,opp_rolling_ERA:4.0,opp_rolling_GSc:50,opp_rolling_FIP:4.2,last5_run_diff:0,last10_run_diff:0,last5_win:hs.last5_winrate,win_streak_fixed:0});
+  }
   else if (g.sport==='ncaab') Object.assign(p,{BARTHAG:v,opp_BARTHAG:1-v,diff_BARTHAG:v-(1-v),ADJNETRTG:(v-.5)*20,opp_ADJNETRTG:-(v-.5)*20,last5_winrate:0.5});
   else if (g.sport==='cfb') Object.assign(p,{team_spread:s,elo_win_prob:v,elo_diff:s*-30,team_sp:s*-2,opp_sp:s*2,sp_diff:s*-4,last3_win:0.5});
-  else if (g.sport==='epl') Object.assign(p,{vegas_prob:v,last5_goals_for:1.5,last10_goals_for:1.5,last5_goals_against:1.3,last10_goals_against:1.3,last5_goal_diff:0,last10_goal_diff:0,last5_shots_for:12,last10_shots_for:12,last5_sot_for:4,last10_sot_for:4,last5_win:0.5,last10_win:0.5,win_streak:0,opp_last5_goals_for:1.5,opp_last10_goals_for:1.5,opp_last5_goals_against:1.3,opp_last10_goals_against:1.3,opp_last5_goal_diff:0,opp_last10_goal_diff:0,opp_last5_win:0.5,opp_last10_win:0.5,opp_win_streak:0,goal_diff_matchup:0,form_diff:0});
-  else if (g.sport==='nhl') Object.assign(p,{pre_game_point_pct:.5+((v-.5)*.3),opp_point_pct:.5-((v-.5)*.3),point_pct_diff:(v-.5)*.6,last5_winrate:0.5,last5_goals_for:3.0,last5_goals_against:3.0});
+  else if (g.sport==='epl') {
+    const hs = (window.teamStats||{})['EPL|'+g.homeTeam] || {last5_winrate:0.5,last10_winrate:0.5};
+    const as = (window.teamStats||{})['EPL|'+g.awayTeam] || {last5_winrate:0.5,last10_winrate:0.5};
+    Object.assign(p,{vegas_prob:v,last5_goals_for:1.5,last10_goals_for:1.5,last5_goals_against:1.3,last10_goals_against:1.3,last5_goal_diff:0,last10_goal_diff:0,last5_shots_for:12,last10_shots_for:12,last5_sot_for:4,last10_sot_for:4,last5_win:hs.last5_winrate,last10_win:hs.last10_winrate,win_streak:0,opp_last5_goals_for:1.5,opp_last10_goals_for:1.5,opp_last5_goals_against:1.3,opp_last10_goals_against:1.3,opp_last5_goal_diff:0,opp_last10_goal_diff:0,opp_last5_win:as.last5_winrate,opp_last10_win:as.last10_winrate,opp_win_streak:0,goal_diff_matchup:0,form_diff:hs.last5_winrate-as.last5_winrate});
+  }
+  else if (g.sport==='nhl') {
+    const hs = (window.teamStats||{})['NHL|'+g.homeTeam] || {last5_winrate:0.5};
+    Object.assign(p,{pre_game_point_pct:.5+((v-.5)*.3),opp_point_pct:.5-((v-.5)*.3),point_pct_diff:(v-.5)*.6,last5_winrate:hs.last5_winrate,last5_goals_for:3.0,last5_goals_against:3.0});
+  }
   return p;
 }
 
