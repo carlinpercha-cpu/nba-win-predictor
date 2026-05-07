@@ -1432,7 +1432,7 @@ async function loadAllGames() {
           id:key+'_'+e.id, sport:key,
           homeTeam:ht, awayTeam:at,
           homeAbbr:home?.team?.abbreviation||'', awayAbbr:away?.team?.abbreviation||'',
-          time:formatTime(e.status?.type?.shortDetail||''), spread:od.spread||spread, vegasProb:od.vegasProb||vegasProb, modelProb:null
+          time:formatTime(e.status?.type?.shortDetail||''), spread:od.spread||spread, vegasProb:od.vegasProb||vegasProb, modelProb:null,
           homeScore: parseInt(home?.score)||null,
           awayScore: parseInt(away?.score)||null,
         });
