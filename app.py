@@ -86,6 +86,7 @@ def health():
             'ncaab_bracket':{'auc': 0.927, 'accuracy': 0.839},
             'cfb':          {'auc': 0.867, 'accuracy': 0.776},
             'nhl':          {'auc': 0.749, 'accuracy': 0.675},
+            'epl':          {'auc': 0.707, 'accuracy': 0.579},
         }
     })
 
@@ -127,6 +128,33 @@ def predict():
             'missing_features': missing,
         })
 
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/predict_3way', methods=['POST'])
+def predict_3way():
+    data = request.get_json()
+    sport = data.get('sport', 'epl').lower()
+    
+    try:
+        model = joblib.load(os.path.join(MODEL_DIR, f'{sport}_3way_model.pkl'))
+        scaler = joblib.load(os.path.join(MODEL_DIR, f'{sport}_3way_scaler.pkl'))
+        features = joblib.load(os.path.join(MODEL_DIR, f'{sport}_3way_features.pkl'))
+        
+        feature_vector = [float(data.get(f, 0)) for f in features]
+        X = np.array(feature_vector).reshape(1, -1)
+        X_scaled = scaler.transform(X)
+        probs = model.predict_proba(X_scaled)[0]
+        
+        return jsonify({
+            'sport': sport,
+            'home_win_prob': round(float(probs[0]), 4),
+            'draw_prob': round(float(probs[1]), 4),
+            'away_win_prob': round(float(probs[2]), 4),
+            'home_win_pct': round(float(probs[0]) * 100, 1),
+            'draw_pct': round(float(probs[1]) * 100, 1),
+            'away_win_pct': round(float(probs[2]) * 100, 1),
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -356,6 +384,7 @@ def get_sports():
             {'key': 'ncaab_bracket', 'name': 'March Madness Bracket',  'auc': 0.927},
             {'key': 'cfb',           'name': 'College Football',       'auc': 0.867},
             {'key': 'nhl',           'name': 'NHL Hockey',             'auc': 0.749},
+            {'key': 'epl',           'name': 'EPL Soccer',             'auc': 0.707},
         ]
     })
 
