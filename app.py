@@ -242,6 +242,103 @@ def update_results():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/bets', methods=['POST'])
+def add_bet():
+    if not sheets_service or not GOOGLE_SHEETS_ID:
+        return jsonify({'error': 'Sheets not configured'}), 500
+    try:
+        data = request.get_json()
+        row = [
+            datetime.utcnow().strftime('%Y-%m-%d'),
+            data.get('sport', ''),
+            data.get('matchup', ''),
+            data.get('pick', ''),
+            data.get('odds', ''),
+            data.get('stake', ''),
+            'pending',
+            ''
+        ]
+        sheets_service.spreadsheets().values().append(
+            spreadsheetId=GOOGLE_SHEETS_ID,
+            range='Bets!A:H',
+            valueInputOption='RAW',
+            body={'values': [row]}
+        ).execute()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/bets', methods=['GET'])
+def get_bets():
+    if not sheets_service or not GOOGLE_SHEETS_ID:
+        return jsonify({'error': 'Sheets not configured'}), 500
+    try:
+        result = sheets_service.spreadsheets().values().get(
+            spreadsheetId=GOOGLE_SHEETS_ID,
+            range='Bets!A:H'
+        ).execute()
+        rows = result.get('values', [])
+        bets = []
+        total_stake = 0
+        total_profit = 0
+        wins = 0
+        decided = 0
+        for row in rows[1:]:
+            if len(row) < 7:
+                continue
+            stake = float(row[5]) if row[5] else 0
+            profit = float(row[7]) if len(row) > 7 and row[7] else 0
+            bets.append({
+                'date': row[0], 'sport': row[1], 'matchup': row[2],
+                'pick': row[3], 'odds': row[4], 'stake': stake,
+                'result': row[6] if len(row) > 6 else 'pending',
+                'profit': profit
+            })
+            if row[6] != 'pending' and len(row) > 6:
+                total_stake += stake
+                total_profit += profit
+                decided += 1
+                if row[6] == 'win': wins += 1
+        roi = round(total_profit/total_stake*100, 1) if total_stake > 0 else 0
+        win_rate = round(wins/decided*100, 1) if decided > 0 else 0
+        return jsonify({
+            'bets': list(reversed(bets)),
+            'total_bets': len(bets),
+            'decided': decided,
+            'wins': wins,
+            'win_rate': win_rate,
+            'total_profit': round(total_profit, 2),
+            'total_staked': round(total_stake, 2),
+            'roi': roi
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/bets/<int:row_num>', methods=['PATCH'])
+def update_bet(row_num):
+    if not sheets_service or not GOOGLE_SHEETS_ID:
+        return jsonify({'error': 'Sheets not configured'}), 500
+    try:
+        data = request.get_json()
+        result = data.get('result', 'pending')
+        odds = float(data.get('odds', 0))
+        stake = float(data.get('stake', 0))
+        if result == 'win':
+            profit = stake * (odds/100) if odds > 0 else stake * (100/abs(odds))
+        elif result == 'loss':
+            profit = -stake
+        else:
+            profit = 0
+        sheets_service.spreadsheets().values().update(
+            spreadsheetId=GOOGLE_SHEETS_ID,
+            range=f'Bets!G{row_num}:H{row_num}',
+            valueInputOption='RAW',
+            body={'values': [[result, round(profit, 2)]]}
+        ).execute()
+        return jsonify({'success': True, 'profit': round(profit, 2)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/features/<sport>')
 def get_features(sport):
     if sport not in models:
