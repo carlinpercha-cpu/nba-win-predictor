@@ -369,6 +369,18 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
 .edge-tag.pos { background: var(--green-dim); color: var(--green); border: 1px solid var(--green-border); }
 .edge-tag.neg { background: var(--red-dim); color: var(--red); }
 .edge-tag.none { color: var(--text3); font-size: 8px; }
+.conf-tier {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 3px;
+  margin-left: 6px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.conf-tier.high { background: var(--green); color: #000; }
+.conf-tier.med { background: var(--yellow); color: #000; }
+.conf-tier.low { background: var(--text3); color: #fff; }
 
 /* EXPANDED */
 .game-expanded {
@@ -1439,6 +1451,14 @@ function renderGames() {
       const edgeNeg = edge!==null && edge < -5;
       if(hasEdge) edges++;
       const pc = mp>=65?'high':mp>=50?'mid':'low';
+      const absEdge = Math.abs(edge||0);
+      let tier = '', tierLabel = '';
+      if (mp !== null && vp !== null) {
+        if (absEdge >= 8) { tier = 'high'; tierLabel = 'HIGH'; }
+        else if (absEdge >= 4) { tier = 'med'; tierLabel = 'MED'; }
+        else { tier = 'low'; tierLabel = 'LOW'; }
+      }
+const tierBadge = tier ? `<span class="conf-tier ${tier}">${tierLabel}</span>` : '';
       let edgeTag = '';
       if(edge!==null){
         if(Math.abs(edge)>=5) edgeTag=`<div class="edge-tag ${edge>0?'pos':'neg'}">${edge>0?'+':''}${edge}% EDGE</div>`;
@@ -1448,7 +1468,7 @@ function renderGames() {
         <div class="game-card-inner">
           <div class="game-teams-col">
             <div class="game-matchup">${g.awayAbbr||g.awayTeam}${g.awayScore!==null?` <span style="color:var(--text2);font-weight:700">${g.awayScore}</span>`:''} <span class="at">@</span> ${g.homeAbbr||g.homeTeam}${g.homeScore!==null?` <span style="color:var(--text2);font-weight:700">${g.homeScore}</span>`:''}</div>
-            <div class="game-meta-row"><span>${sport.toUpperCase()}</span>${g.time==='Final'?'<span style="color:var(--text3)">· FINAL</span>':(g.time&&!g.time.includes('PM')&&!g.time.includes('AM')&&g.time!=='TBD')?`<span style="color:var(--green)">· ● LIVE</span>`:''}</div>
+            <div class="game-meta-row"><span>${sport.toUpperCase()}</span>${tierBadge}${g.time==='Final'?'<span style="color:var(--text3)">· FINAL</span>':(g.time&&!g.time.includes('PM')&&!g.time.includes('AM')&&g.time!=='TBD')?`<span style="color:var(--green)">· ● LIVE</span>`:''}</div>
           </div>
           <div class="game-time-col">
             <div class="game-time-val">${g.time&&g.time!=='TBD'?g.time:'TBD'}</div>
