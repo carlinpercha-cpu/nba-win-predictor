@@ -11,7 +11,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 MODEL_DIR = os.path.join(os.path.dirname(__file__), 'models')
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
@@ -62,15 +62,15 @@ def load_model(sport):
     features = joblib.load(os.path.join(MODEL_DIR, f'{sport}_features.pkl'))
     return model, scaler, features
 
-print("Loading models...")
 models = {}
-for sport in ['nba', 'nfl', 'mlb', 'ncaab', 'ncaab_bracket', 'cfb', 'nhl']:
-    try:
-        models[sport] = load_model(sport)
-        print(f"  {sport}: loaded ({len(models[sport][2])} features)")
-    except Exception as e:
-        print(f"  {sport}: FAILED — {e}")
-print("All models loaded.")
+
+def get_model(sport):
+    if sport not in models:
+        try:
+            models[sport] = load_model(sport)
+        except Exception as e:
+            return None
+    return models[sport]
 
 @app.route('/health')
 def health():
@@ -94,11 +94,10 @@ def predict():
     data = request.get_json()
     sport = data.get('sport', 'nba').lower()
 
-    if sport not in models:
-        return jsonify({'error': f'Unknown sport: {sport}. Available: {list(models.keys())}'}), 400
-
-    model, scaler, features = models[sport]
-
+    loaded = get_model(sport)
+    if loaded is None:
+        return jsonify({'error': f'Model unavailable: {sport}'}), 400
+    model, scaler, features = loaded
     try:
         feature_vector = []
         missing = []
