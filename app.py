@@ -278,11 +278,33 @@ def refresh_stats():
 
     # ===== NBA =====
         nba_result = fetch_nba_team_stats()
-        results['nba_debug'] = nba_result.get('debug', {})
-        nba_stats = nba_result.get('stats', [])
-        results['nba_count'] = len(nba_stats)
-        if nba_stats:
-            write_team_stats('NBA', nba_stats)    
+        results['nba_count'] = len(nba_result.get('stats', []))
+        if nba_result.get('stats'):
+            write_team_stats('NBA', nba_result['stats'])
+
+        # ===== NFL =====
+        nfl_result = fetch_espn_team_stats('football', 'nfl')
+        results['nfl_count'] = len(nfl_result.get('stats', []))
+        if nfl_result.get('stats'):
+            write_team_stats('NFL', nfl_result['stats'])
+
+        # ===== MLB =====
+        mlb_result = fetch_espn_team_stats('baseball', 'mlb')
+        results['mlb_count'] = len(mlb_result.get('stats', []))
+        if mlb_result.get('stats'):
+            write_team_stats('MLB', mlb_result['stats'])
+
+        # ===== NHL =====
+        nhl_result = fetch_espn_team_stats('hockey', 'nhl')
+        results['nhl_count'] = len(nhl_result.get('stats', []))
+        if nhl_result.get('stats'):
+            write_team_stats('NHL', nhl_result['stats'])
+
+        # ===== EPL =====
+        epl_result = fetch_espn_team_stats('soccer', 'eng.1')
+        results['epl_count'] = len(epl_result.get('stats', []))
+        if epl_result.get('stats'):
+            write_team_stats('EPL', epl_result['stats'])
 
         return jsonify({'status': 'ok', 'updated': results})
     except Exception as e:
@@ -311,6 +333,75 @@ def get_team_stats():
         return jsonify(stats)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+def fetch_espn_team_stats(sport, league):
+    """Generic ESPN team stats fetcher for any sport/league."""
+    try:
+        teams_resp = requests.get(
+            f'https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/teams',
+            timeout=15
+        )
+        teams_data = teams_resp.json()
+        teams = teams_data.get('sports', [{}])[0].get('leagues', [{}])[0].get('teams', [])
+
+        team_stats = []
+        for team_wrapper in teams:
+            team = team_wrapper.get('team', {})
+            team_id = team.get('id')
+            team_name = team.get('displayName')
+            if not team_id:
+                continue
+
+            try:
+                schedule_resp = requests.get(
+                    f'https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/teams/{team_id}/schedule',
+                    timeout=15
+                )
+                events = schedule_resp.json().get('events', [])
+                completed = []
+                for event in events:
+                    competitions = event.get('competitions', [{}])
+                    if not competitions:
+                        continue
+                    comp = competitions[0]
+                    is_completed = comp.get('status', {}).get('type', {}).get('completed', False)
+                    if not is_completed:
+                        continue
+                    competitors = comp.get('competitors', [])
+                    team_comp = next((c for c in competitors if str(c.get('team', {}).get('id')) == str(team_id)), None)
+                    opp_comp = next((c for c in competitors if str(c.get('team', {}).get('id')) != str(team_id)), None)
+                    if not team_comp or not opp_comp:
+                        continue
+                    team_score_str = team_comp.get('score', '0')
+                    opp_score_str = opp_comp.get('score', '0')
+                    if isinstance(team_score_str, dict):
+                        team_score_str = team_score_str.get('value', '0')
+                    if isinstance(opp_score_str, dict):
+                        opp_score_str = opp_score_str.get('value', '0')
+                    team_score = int(team_score_str) if team_score_str else 0
+                    opp_score = int(opp_score_str) if opp_score_str else 0
+                    won = 1 if team_score > opp_score else 0
+                    completed.append({'won': won})
+
+                if len(completed) == 0:
+                    continue
+                completed = completed[-10:]
+                last5 = completed[-5:]
+                wr5 = sum(g['won'] for g in last5) / len(last5)
+                wr10 = sum(g['won'] for g in completed) / len(completed)
+                team_stats.append({
+                    'team_id': team_id,
+                    'team_name': team_name,
+                    'last5_winrate': round(wr5, 3),
+                    'last10_winrate': round(wr10, 3),
+                    'games_played': len(completed),
+                })
+            except Exception:
+                continue
+
+        return {'stats': team_stats}
+    except Exception as e:
+        return {'stats': [], 'error': str(e)}
 
 def fetch_nba_team_stats():
     """Fetch last 10 games stats for each NBA team from ESPN."""
