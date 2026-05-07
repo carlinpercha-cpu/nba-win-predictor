@@ -11,7 +11,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, resources={r"/*": {"origins": "*"}}, methods=['GET', 'POST', 'PATCH', 'OPTIONS'], allow_headers=['Content-Type'])
 
 MODEL_DIR = os.path.join(os.path.dirname(__file__), 'models')
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
