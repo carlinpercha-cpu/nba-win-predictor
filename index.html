@@ -1323,7 +1323,7 @@ async function loadAllGames() {
         id:'nba_'+g.id, sport:'nba',
         homeTeam:ht, awayTeam:at,
         homeAbbr:g.home_team.abbreviation, awayAbbr:g.visitor_team.abbreviation,
-        time:formatTime(g.status), spread:od.spread||null, vegasProb:od.vegasProb||null, modelProb:null,
+        time:formatTime(g.status), spread:od.spread||null, vegasProb:od.vegasProb||null, modelProb:null
         homeScore: g.home_team_score||null,
         awayScore: g.visitor_team_score||null,
       });
@@ -1360,7 +1360,7 @@ async function loadAllGames() {
           id:key+'_'+e.id, sport:key,
           homeTeam:ht, awayTeam:at,
           homeAbbr:home?.team?.abbreviation||'', awayAbbr:away?.team?.abbreviation||'',
-          time:formatTime(e.status?.type?.shortDetail||''), spread:od.spread||spread, vegasProb:od.vegasProb||vegasProb, modelProb:null,
+          time:formatTime(e.status?.type?.shortDetail||''), spread:od.spread||spread, vegasProb:od.vegasProb||vegasProb, modelProb:null
           homeScore: parseInt(home?.score)||null,
           awayScore: parseInt(away?.score)||null,
         });
@@ -1534,7 +1534,7 @@ Give a concise 3-4 sentence betting analysis. Focus on whether the model edge is
     const r = await fetch('https://nba-win-predictor-airk.onrender.com/claude',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:400,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})
     });
     const d = await r.json();
     const text = (d.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
@@ -1654,7 +1654,7 @@ Provide a thorough 5-6 sentence analysis covering the key factors that will dete
     const r = await fetch('https://nba-win-predictor-airk.onrender.com/claude',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:700,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})
     });
     const d = await r.json();
     const text = (d.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
