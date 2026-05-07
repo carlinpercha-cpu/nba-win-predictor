@@ -894,6 +894,9 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
   <div class="nav-item" onclick="showPage('chat')" id="tab-chat">
     Analyst Chat
   </div>
+  <div class="nav-item" onclick="showPage('bets')" id="tab-bets">
+    Bet Tracker
+  </div>
   <div class="nav-item" onclick="showPage('record')" id="tab-record">
     Model Record
   </div>
@@ -960,6 +963,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
         </div>
         <div style="display:flex;align-items:center;gap:10px;">
           <span style="font-size:11px;color:var(--text3);" id="edge-label"></span>
+          <button class="refresh-btn" onclick="toggleEdgeFilter()" id="edge-filter-btn" style="margin-right:6px">All Games</button>
           <button class="refresh-btn" onclick="loadAllGames()">↻ Refresh</button>
         </div>
       </div>
@@ -1079,6 +1083,61 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
     <div class="chat-sidebar">
       <div class="chat-sidebar-title">Today's Predictions</div>
       <div id="chat-ctx"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== BETS PAGE ===== -->
+<div class="page" id="page-bets">
+  <div class="about-wrap">
+    <div class="page-header" style="margin-bottom:24px;">
+      <div>
+        <div class="page-title">Bet Tracker</div>
+        <div class="page-subtitle">Log your picks · Track ROI · Compare to model</div>
+      </div>
+      <button class="refresh-btn" onclick="loadBets()">↻ Refresh</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
+      <div class="sport-perf-card"><div class="sport-perf-sport">Total Bets</div><div class="sport-perf-auc" id="bet-total">—</div></div>
+      <div class="sport-perf-card"><div class="sport-perf-sport">Win Rate</div><div class="sport-perf-auc" id="bet-winrate">—</div></div>
+      <div class="sport-perf-card"><div class="sport-perf-sport">Net Profit</div><div class="sport-perf-auc" id="bet-profit">—</div></div>
+      <div class="sport-perf-card"><div class="sport-perf-sport">ROI</div><div class="sport-perf-auc" id="bet-roi">—</div></div>
+    </div>
+
+    <div class="sport-perf-card" style="margin-bottom:20px;padding:20px;">
+      <div class="about-card-title">Log a New Bet</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;align-items:end;">
+        <div>
+          <div class="team-card-label">Sport</div>
+          <select class="team-select" id="bet-sport">
+            <option value="NBA">NBA</option><option value="NFL">NFL</option>
+            <option value="MLB">MLB</option><option value="NHL">NHL</option>
+            <option value="NCAAB">NCAAB</option><option value="CFB">CFB</option>
+          </select>
+        </div>
+        <div>
+          <div class="team-card-label">Matchup</div>
+          <input class="chat-field" id="bet-matchup" placeholder="LAL @ BOS" style="width:100%">
+        </div>
+        <div>
+          <div class="team-card-label">Pick</div>
+          <input class="chat-field" id="bet-pick" placeholder="LAL ML" style="width:100%">
+        </div>
+        <div>
+          <div class="team-card-label">Odds (American)</div>
+          <input class="chat-field" id="bet-odds" type="number" placeholder="-110" style="width:100%">
+        </div>
+        <div>
+          <div class="team-card-label">Stake ($)</div>
+          <input class="chat-field" id="bet-stake" type="number" placeholder="100" style="width:100%">
+        </div>
+      </div>
+      <button class="predict-btn-main" style="margin-top:14px;margin-bottom:0" onclick="logBet()">Log Bet</button>
+    </div>
+
+    <div id="bets-table" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;overflow-x:auto;">
+      <div class="empty-state">Loading bets...</div>
     </div>
   </div>
 </div>
@@ -1274,6 +1333,7 @@ function showPage(p) {
   document.getElementById('page-' + p).classList.add('active');
   document.getElementById('tab-' + p).classList.add('active');
   if (p === 'record') loadRecord();
+  if (p === 'bets') loadBets();
 }
 
 // ---- LOAD GAMES ----
@@ -1335,7 +1395,7 @@ async function loadAllGames() {
         id:'nba_'+g.id, sport:'nba',
         homeTeam:ht, awayTeam:at,
         homeAbbr:g.home_team.abbreviation, awayAbbr:g.visitor_team.abbreviation,
-        time:formatTime(g.status), spread:od.spread||null, vegasProb:od.vegasProb||null, modelProb:null,
+        time:formatTime(g.status), spread:od.spread||null, vegasProb:od.vegasProb||null, modelProb:null
         homeScore: g.home_team_score||null,
         awayScore: g.visitor_team_score||null,
       });
@@ -1372,7 +1432,7 @@ async function loadAllGames() {
           id:key+'_'+e.id, sport:key,
           homeTeam:ht, awayTeam:at,
           homeAbbr:home?.team?.abbreviation||'', awayAbbr:away?.team?.abbreviation||'',
-          time:formatTime(e.status?.type?.shortDetail||''), spread:od.spread||spread, vegasProb:od.vegasProb||vegasProb, modelProb:null,
+          time:formatTime(e.status?.type?.shortDetail||''), spread:od.spread||spread, vegasProb:od.vegasProb||vegasProb, modelProb:null
           homeScore: parseInt(home?.score)||null,
           awayScore: parseInt(away?.score)||null,
         });
@@ -1421,6 +1481,16 @@ function updateCounts() {
   document.getElementById('game-badge').textContent = counts.all;
 }
 
+let hideLowEdge = false;
+function toggleEdgeFilter() {
+  hideLowEdge = !hideLowEdge;
+  const btn = document.getElementById('edge-filter-btn');
+  btn.textContent = hideLowEdge ? 'Edges Only ◆' : 'All Games';
+  btn.style.borderColor = hideLowEdge ? 'var(--green)' : '';
+  btn.style.color = hideLowEdge ? 'var(--green)' : '';
+  renderGames();
+}
+
 function filterSport(sport) {
   currentFilter = sport;
   document.querySelectorAll('.sport-row').forEach(r=>r.classList.remove('active'));
@@ -1433,7 +1503,14 @@ const MODEL_AUC = {nba:0.727,nfl:0.710,mlb:0.653,ncaab:0.862,cfb:0.867,nhl:0.749
 const HOME_ADV = {nba:'58.8%',nfl:'53.3%',mlb:'54.4%',ncaab:'74.3%',cfb:'57.9%',nhl:'53.6%'};
 
 function renderGames() {
-  const filtered = currentFilter==='all' ? allGames : allGames.filter(g=>g.sport===currentFilter);
+  let filtered = currentFilter==='all' ? allGames : allGames.filter(g=>g.sport===currentFilter);
+  filtered = filtered.map(g => {
+    const mp = g.modelProb!==null ? Math.round(g.modelProb*100) : null;
+    const vp = g.vegasProb!==null ? Math.round(g.vegasProb*100) : null;
+    g._edge = (mp!==null && vp!==null) ? Math.abs(mp-vp) : -1;
+    return g;
+  }).sort((a,b) => b._edge - a._edge);
+  if (hideLowEdge) filtered = filtered.filter(g => g._edge >= 5);
   const container = document.getElementById('games-container');
   if (!filtered.length) { container.innerHTML='<div class="empty-state">No games found for this sport today.</div>'; return; }
 
@@ -1728,6 +1805,73 @@ function addMsg(role, html) {
   d.innerHTML=`<div class="chat-msg-label">${role==='user'?'You':'EDGE Analyst'}</div><div class="chat-msg-bubble">${html}</div>`;
   c.appendChild(d); c.scrollTop=c.scrollHeight;
   return d;
+}
+
+async function logBet() {
+  const sport = document.getElementById('bet-sport').value;
+  const matchup = document.getElementById('bet-matchup').value;
+  const pick = document.getElementById('bet-pick').value;
+  const odds = document.getElementById('bet-odds').value;
+  const stake = document.getElementById('bet-stake').value;
+  if (!matchup || !pick || !odds || !stake) { alert('Fill all fields'); return; }
+  try {
+    await fetch(API + '/bets', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({sport, matchup, pick, odds, stake})
+    });
+    document.getElementById('bet-matchup').value = '';
+    document.getElementById('bet-pick').value = '';
+    document.getElementById('bet-odds').value = '';
+    document.getElementById('bet-stake').value = '';
+    loadBets();
+  } catch(e) { alert('Failed to log bet: ' + e.message); }
+}
+
+async function updateBetResult(rowNum, result, odds, stake) {
+  try {
+    await fetch(API + '/bets/' + rowNum, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({result, odds, stake})
+    });
+    loadBets();
+  } catch(e) { alert('Failed: ' + e.message); }
+}
+
+async function loadBets() {
+  const tbl = document.getElementById('bets-table');
+  tbl.innerHTML = '<div class="empty-state"><div class="spinner"></div> Loading...</div>';
+  try {
+    const r = await fetch(API + '/bets');
+    const d = await r.json();
+    document.getElementById('bet-total').textContent = d.total_bets || 0;
+    document.getElementById('bet-winrate').textContent = d.decided > 0 ? d.win_rate + '%' : '—';
+    const profitEl = document.getElementById('bet-profit');
+    profitEl.textContent = d.decided > 0 ? '$' + d.total_profit : '—';
+    profitEl.style.color = d.total_profit > 0 ? 'var(--green)' : d.total_profit < 0 ? 'var(--red)' : '';
+    const roiEl = document.getElementById('bet-roi');
+    roiEl.textContent = d.decided > 0 ? d.roi + '%' : '—';
+    roiEl.style.color = d.roi > 0 ? 'var(--green)' : d.roi < 0 ? 'var(--red)' : '';
+    if (!d.bets || !d.bets.length) { tbl.innerHTML = '<div class="empty-state">No bets logged yet</div>'; return; }
+    let html = '<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="border-bottom:1px solid var(--border);color:var(--text3);text-align:left;"><th style="padding:8px">Date</th><th style="padding:8px">Sport</th><th style="padding:8px">Matchup</th><th style="padding:8px">Pick</th><th style="padding:8px">Odds</th><th style="padding:8px">Stake</th><th style="padding:8px">Profit</th><th style="padding:8px">Result</th></tr></thead><tbody>';
+    d.bets.forEach((b, idx) => {
+      const rowNum = d.bets.length - idx + 1;
+      let resultCell = '';
+      if (b.result === 'pending') {
+        resultCell = `<button class="analyze-btn" style="margin-right:4px" onclick="updateBetResult(${rowNum},'win',${b.odds},${b.stake})">Win</button><button class="analyze-btn" style="border-color:var(--red);color:var(--red)" onclick="updateBetResult(${rowNum},'loss',${b.odds},${b.stake})">Loss</button>`;
+      } else if (b.result === 'win') {
+        resultCell = '<span style="color:var(--green);font-weight:600">✓ Win</span>';
+      } else {
+        resultCell = '<span style="color:var(--red);font-weight:600">✗ Loss</span>';
+      }
+      const profitStr = b.profit > 0 ? '+$'+b.profit.toFixed(2) : b.profit < 0 ? '-$'+Math.abs(b.profit).toFixed(2) : '—';
+      const profitColor = b.profit > 0 ? 'var(--green)' : b.profit < 0 ? 'var(--red)' : 'var(--text3)';
+      html += `<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px;color:var(--text2)">${b.date}</td><td style="padding:8px;color:var(--text2)">${b.sport}</td><td style="padding:8px">${b.matchup}</td><td style="padding:8px">${b.pick}</td><td style="padding:8px">${b.odds}</td><td style="padding:8px">$${b.stake}</td><td style="padding:8px;color:${profitColor};font-weight:600">${profitStr}</td><td style="padding:8px">${resultCell}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    tbl.innerHTML = html;
+  } catch(e) { tbl.innerHTML = '<div class="empty-state">Error loading bets</div>'; }
 }
 
 async function loadRecord() {
