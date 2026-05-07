@@ -187,6 +187,61 @@ def get_record():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/update_results', methods=['POST'])
+def update_results():
+    if not sheets_service or not GOOGLE_SHEETS_ID:
+        return jsonify({'error': 'Sheets not configured'}), 500
+    try:
+        result = sheets_service.spreadsheets().values().get(
+            spreadsheetId=GOOGLE_SHEETS_ID,
+            range='Sheet1!A:I'
+        ).execute()
+        rows = result.get('values', [])
+        updated = 0
+        sport_apis = {
+            'NBA': ('basketball', 'nba'),
+            'NFL': ('football', 'nfl'),
+            'MLB': ('baseball', 'mlb'),
+            'NHL': ('hockey', 'nhl'),
+            'NCAAB': ('basketball', 'mens-college-basketball'),
+            'CFB': ('football', 'college-football'),
+        }
+        for i, row in enumerate(rows[1:], start=2):
+            if len(row) < 9 or row[8] != 'pending':
+                continue
+            sport, home_team, away_team, prediction, game_id = row[1], row[2], row[3], row[6], row[7]
+            if sport not in sport_apis:
+                continue
+            sport_path, league = sport_apis[sport]
+            try:
+                espn_id = game_id.split('_')[1] if '_' in game_id else game_id
+                r = requests.get(f'https://site.api.espn.com/apis/site/v2/sports/{sport_path}/{league}/summary?event={espn_id}', timeout=10)
+                d = r.json()
+                comp = d.get('header', {}).get('competitions', [{}])[0]
+                status = comp.get('status', {}).get('type', {}).get('completed', False)
+                if not status:
+                    continue
+                competitors = comp.get('competitors', [])
+                home = next((c for c in competitors if c.get('homeAway') == 'home'), None)
+                away = next((c for c in competitors if c.get('homeAway') == 'away'), None)
+                if not home or not away:
+                    continue
+                home_score = int(home.get('score', 0))
+                away_score = int(away.get('score', 0))
+                actual_winner = 'home' if home_score > away_score else 'away'
+                sheets_service.spreadsheets().values().update(
+                    spreadsheetId=GOOGLE_SHEETS_ID,
+                    range=f'Sheet1!I{i}',
+                    valueInputOption='RAW',
+                    body={'values': [[actual_winner]]}
+                ).execute()
+                updated += 1
+            except Exception as e:
+                print(f"Update error for {game_id}: {e}")
+        return jsonify({'updated': updated})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/features/<sport>')
 def get_features(sport):
     if sport not in models:
