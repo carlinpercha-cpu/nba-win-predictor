@@ -162,7 +162,7 @@ def get_record():
         ).execute()
         rows = result.get('values', [])
         predictions = []
-        for row in rows:
+        for row in rows[1:]:
             if len(row) >= 9:
                 predictions.append({
                     'date': row[0],
