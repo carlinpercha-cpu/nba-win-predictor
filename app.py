@@ -275,36 +275,30 @@ def refresh_stats():
         return jsonify({'error': 'Sheets not configured'}), 500
     try:
         results = {}
-
-    # ===== NBA =====
-        nba_result = fetch_nba_team_stats()
-        results['nba_count'] = len(nba_result.get('stats', []))
-        if nba_result.get('stats'):
-            write_team_stats('NBA', nba_result['stats'])
-
-        # ===== NFL =====
-        nfl_result = fetch_espn_team_stats('football', 'nfl')
-        results['nfl_count'] = len(nfl_result.get('stats', []))
-        if nfl_result.get('stats'):
-            write_team_stats('NFL', nfl_result['stats'])
-
-        # ===== MLB =====
-        mlb_result = fetch_espn_team_stats('baseball', 'mlb')
-        results['mlb_count'] = len(mlb_result.get('stats', []))
-        if mlb_result.get('stats'):
-            write_team_stats('MLB', mlb_result['stats'])
-
-        # ===== NHL =====
-        nhl_result = fetch_espn_team_stats('hockey', 'nhl')
-        results['nhl_count'] = len(nhl_result.get('stats', []))
-        if nhl_result.get('stats'):
-            write_team_stats('NHL', nhl_result['stats'])
-
-        # ===== EPL =====
-        epl_result = fetch_espn_team_stats('soccer', 'eng.1')
-        results['epl_count'] = len(epl_result.get('stats', []))
-        if epl_result.get('stats'):
-            write_team_stats('EPL', epl_result['stats'])
+        sport_param = request.args.get('sport', 'all').lower()
+        
+        sport_configs = {
+            'nba': ('basketball', 'nba'),
+            'nfl': ('football', 'nfl'),
+            'mlb': ('baseball', 'mlb'),
+            'nhl': ('hockey', 'nhl'),
+            'epl': ('soccer', 'eng.1'),
+        }
+        
+        if sport_param == 'all':
+            sports_to_run = list(sport_configs.keys())
+        elif sport_param in sport_configs:
+            sports_to_run = [sport_param]
+        else:
+            return jsonify({'error': f'Unknown sport: {sport_param}'}), 400
+        
+        for sport in sports_to_run:
+            espn_sport, espn_league = sport_configs[sport]
+            result = fetch_espn_team_stats(espn_sport, espn_league)
+            stats = result.get('stats', [])
+            results[f'{sport}_count'] = len(stats)
+            if stats:
+                write_team_stats(sport.upper(), stats)
 
         return jsonify({'status': 'ok', 'updated': results})
     except Exception as e:
