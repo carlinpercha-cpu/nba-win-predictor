@@ -269,6 +269,123 @@ def update_results():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/refresh_stats', methods=['POST'])
+def refresh_stats():
+    if not sheets_service or not GOOGLE_SHEETS_ID:
+        return jsonify({'error': 'Sheets not configured'}), 500
+    try:
+        results = {}
+
+        # ===== NBA =====
+        nba_stats = fetch_nba_team_stats()
+        if nba_stats:
+            write_team_stats('NBA', nba_stats)
+            results['nba'] = len(nba_stats)
+
+        return jsonify({'status': 'ok', 'updated': results})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+def fetch_nba_team_stats():
+    """Fetch last 10 games stats for each NBA team from ESPN."""
+    try:
+        teams_resp = requests.get(
+            'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams',
+            timeout=15
+        )
+        teams_data = teams_resp.json()
+        teams = teams_data.get('sports', [{}])[0].get('leagues', [{}])[0].get('teams', [])
+
+        team_stats = []
+        for team_wrapper in teams:
+            team = team_wrapper.get('team', {})
+            team_id = team.get('id')
+            team_name = team.get('displayName')
+            if not team_id:
+                continue
+
+            # Fetch this team's recent games
+            schedule_resp = requests.get(
+                f'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{team_id}/schedule',
+                timeout=15
+            )
+            schedule = schedule_resp.json().get('events', [])
+
+            # Get completed games (most recent 10)
+            completed = []
+            for event in schedule:
+                comp = event.get('competitions', [{}])[0]
+                status = comp.get('status', {}).get('type', {}).get('completed', False)
+                if not status:
+                    continue
+                competitors = comp.get('competitors', [])
+                team_comp = next((c for c in competitors if c.get('team', {}).get('id') == team_id), None)
+                opp_comp = next((c for c in competitors if c.get('team', {}).get('id') != team_id), None)
+                if not team_comp or not opp_comp:
+                    continue
+                team_score = int(team_comp.get('score', 0))
+                opp_score = int(opp_comp.get('score', 0))
+                won = 1 if team_score > opp_score else 0
+                completed.append({
+                    'won': won,
+                    'pts_for': team_score,
+                    'pts_against': opp_score,
+                })
+
+            completed = completed[-10:]
+            if len(completed) == 0:
+                continue
+
+            last5 = completed[-5:]
+            last10 = completed
+            wr5 = sum(g['won'] for g in last5) / len(last5)
+            wr10 = sum(g['won'] for g in last10) / len(last10)
+
+            team_stats.append({
+                'team_id': team_id,
+                'team_name': team_name,
+                'last5_winrate': round(wr5, 3),
+                'last10_winrate': round(wr10, 3),
+                'games_played': len(completed),
+            })
+
+        return team_stats
+    except Exception as e:
+        print(f"NBA stats fetch error: {e}")
+        return None
+
+
+def write_team_stats(sport, stats):
+    """Write team stats to TeamStats tab in Google Sheet."""
+    try:
+        # Clear existing rows for this sport
+        all_rows = sheets_service.spreadsheets().values().get(
+            spreadsheetId=GOOGLE_SHEETS_ID,
+            range='TeamStats!A:F'
+        ).execute().get('values', [])
+
+        # Keep header + non-matching sport rows
+        header = ['Sport', 'Team ID', 'Team Name', 'Last5 WinRate', 'Last10 WinRate', 'Games Played']
+        kept = [r for r in all_rows[1:] if len(r) > 0 and r[0] != sport]
+
+        new_rows = [[sport, s['team_id'], s['team_name'], s['last5_winrate'],
+                     s['last10_winrate'], s['games_played']] for s in stats]
+
+        sheets_service.spreadsheets().values().clear(
+            spreadsheetId=GOOGLE_SHEETS_ID,
+            range='TeamStats!A:F'
+        ).execute()
+
+        sheets_service.spreadsheets().values().update(
+            spreadsheetId=GOOGLE_SHEETS_ID,
+            range='TeamStats!A1',
+            valueInputOption='RAW',
+            body={'values': [header] + kept + new_rows}
+        ).execute()
+    except Exception as e:
+        print(f"Sheets write error: {e}")
+
 @app.route('/bets', methods=['POST'])
 def add_bet():
     if not sheets_service or not GOOGLE_SHEETS_ID:
