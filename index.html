@@ -1447,8 +1447,8 @@ function renderGames() {
       html += `<div class="game-card ${hasEdge&&!edgeNeg?'has-edge':''} ${edgeNeg?'has-edge-neg':''}" id="gc-${g.id}" onclick="toggleGame('${g.id}')">
         <div class="game-card-inner">
           <div class="game-teams-col">
-            <div class="game-matchup">${g.awayAbbr||g.awayTeam} <span class="at">@</span> ${g.homeAbbr||g.homeTeam}</div>
-            <div class="game-meta-row"><span>${sport.toUpperCase()}</span></div>
+            <div class="game-matchup">${g.awayAbbr||g.awayTeam}${g.awayScore!==null?` <span style="color:var(--text2);font-weight:700">${g.awayScore}</span>`:''} <span class="at">@</span> ${g.homeAbbr||g.homeTeam}${g.homeScore!==null?` <span style="color:var(--text2);font-weight:700">${g.homeScore}</span>`:''}</div>
+            <div class="game-meta-row"><span>${sport.toUpperCase()}</span>${g.time==='Final'?'<span style="color:var(--text3)">· FINAL</span>':(g.time&&!g.time.includes('PM')&&!g.time.includes('AM')&&g.time!=='TBD')?`<span style="color:var(--green)">· ● LIVE</span>`:''}</div>
           </div>
           <div class="game-time-col">
             <div class="game-time-val">${g.time&&g.time!=='TBD'?g.time:'TBD'}</div>
