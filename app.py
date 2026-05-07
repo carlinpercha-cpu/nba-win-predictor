@@ -225,6 +225,8 @@ def update_results():
         ).execute()
         rows = result.get('values', [])
         updated = 0
+        skipped = 0
+        max_updates = 20  # cap per run to stay under Render's 30s timeout
         sport_apis = {
             'NBA': ('basketball', 'nba'),
             'NFL': ('football', 'nfl'),
@@ -232,8 +234,11 @@ def update_results():
             'NHL': ('hockey', 'nhl'),
             'NCAAB': ('basketball', 'mens-college-basketball'),
             'CFB': ('football', 'college-football'),
+            'EPL': ('soccer', 'eng.1'),
         }
         for i, row in enumerate(rows[1:], start=2):
+            if updated >= max_updates:
+                break
             if len(row) < 9 or row[8] != 'pending':
                 continue
             sport, home_team, away_team, prediction, game_id = row[1], row[2], row[3], row[6], row[7]
@@ -242,11 +247,12 @@ def update_results():
             sport_path, league = sport_apis[sport]
             try:
                 espn_id = game_id.split('_')[1] if '_' in game_id else game_id
-                r = requests.get(f'https://site.api.espn.com/apis/site/v2/sports/{sport_path}/{league}/summary?event={espn_id}', timeout=10)
+                r = requests.get(f'https://site.api.espn.com/apis/site/v2/sports/{sport_path}/{league}/summary?event={espn_id}', timeout=8)
                 d = r.json()
                 comp = d.get('header', {}).get('competitions', [{}])[0]
                 status = comp.get('status', {}).get('type', {}).get('completed', False)
                 if not status:
+                    skipped += 1
                     continue
                 competitors = comp.get('competitors', [])
                 home = next((c for c in competitors if c.get('homeAway') == 'home'), None)
@@ -265,7 +271,7 @@ def update_results():
                 updated += 1
             except Exception as e:
                 print(f"Update error for {game_id}: {e}")
-        return jsonify({'updated': updated})
+        return jsonify({'updated': updated, 'skipped': skipped})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
