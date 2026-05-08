@@ -1182,7 +1182,17 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
       </div>
     </div>
 
-    <!-- All 7 models uniform grid -->
+    <!-- Calibration chart -->
+    <div class="sport-perf-card" style="margin-bottom:20px;padding:20px;">
+      <div class="about-card-title">Model Calibration</div>
+      <div class="page-subtitle" style="margin-bottom:16px;font-size:11px;">When model predicts X% confidence, how often it's actually right · Closer to diagonal = better calibrated</div>
+      <div id="calibration-chart" style="display:flex;align-items:flex-end;gap:8px;height:200px;padding:10px 0;border-bottom:1px solid var(--border);position:relative;">
+        <div class="empty-state" style="margin:auto;">Loading calibration data...</div>
+      </div>
+      <div id="calibration-labels" style="display:flex;gap:8px;margin-top:8px;font-size:10px;color:var(--text3);"></div>
+    </div>
+    
+    <!-- All 8 models uniform grid -->
     <div class="sport-perf-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px;">
       <div class="sport-perf-card">
         <div class="sport-perf-sport">🏀 NBA Basketball</div>
@@ -1355,6 +1365,69 @@ function showPage(p) {
   document.getElementById('tab-' + p).classList.add('active');
   if (p === 'record') loadRecord();
   if (p === 'bets') loadBets();
+  if (p === 'about') loadCalibration();
+}
+
+async function loadCalibration() {
+  const chart = document.getElementById('calibration-chart');
+  const labels = document.getElementById('calibration-labels');
+  if (!chart) return;
+  try {
+    const r = await fetch(API + '/calibration');
+    const d = await r.json();
+    const cal = d.calibration || [];
+    
+    chart.innerHTML = '';
+    labels.innerHTML = '';
+    
+    // Draw diagonal reference line as background
+    chart.innerHTML = '<svg style="position:absolute;top:10px;left:10px;width:calc(100% - 20px);height:calc(100% - 10px);pointer-events:none;" viewBox="0 0 100 100" preserveAspectRatio="none"><line x1="0" y1="100" x2="100" y2="0" stroke="rgba(255,255,255,0.15)" stroke-width="0.5" stroke-dasharray="2,2"/></svg>';
+    
+    cal.forEach(b => {
+      const col = document.createElement('div');
+      col.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;height:100%;justify-content:flex-end;position:relative;z-index:1;';
+      
+      if (b.actual_winrate !== null) {
+        const predHeight = (b.predicted_avg / 100) * 180;
+        const actualHeight = (b.actual_winrate / 100) * 180;
+        const diff = Math.abs(b.predicted_avg - b.actual_winrate);
+        const color = diff < 5 ? 'var(--green)' : diff < 10 ? 'var(--yellow)' : 'var(--red)';
+        
+        col.innerHTML = `
+          <div style="font-size:10px;color:${color};font-weight:600;">${b.actual_winrate}%</div>
+          <div style="display:flex;gap:2px;align-items:flex-end;">
+            <div title="Predicted: ${b.predicted_avg}%" style="width:14px;height:${predHeight}px;background:rgba(100,150,255,0.6);border-radius:2px 2px 0 0;"></div>
+            <div title="Actual: ${b.actual_winrate}%" style="width:14px;height:${actualHeight}px;background:${color};border-radius:2px 2px 0 0;"></div>
+          </div>
+        `;
+      } else {
+        col.innerHTML = `
+          <div style="font-size:10px;color:var(--text3);">No data</div>
+          <div style="width:30px;height:2px;background:var(--border);border-radius:1px;"></div>
+        `;
+      }
+      
+      chart.appendChild(col);
+      
+      const label = document.createElement('div');
+      label.style.cssText = 'flex:1;text-align:center;';
+      label.textContent = `${b.low}-${b.high}%`;
+      labels.appendChild(label);
+    });
+    
+    // Add legend
+    const legend = document.createElement('div');
+    legend.style.cssText = 'margin-top:12px;display:flex;gap:16px;font-size:10px;color:var(--text3);';
+    legend.innerHTML = `
+      <div style="display:flex;align-items:center;gap:4px;"><div style="width:10px;height:10px;background:rgba(100,150,255,0.6);border-radius:2px;"></div>Predicted</div>
+      <div style="display:flex;align-items:center;gap:4px;"><div style="width:10px;height:10px;background:var(--green);border-radius:2px;"></div>Actual (well-calibrated)</div>
+      <div style="display:flex;align-items:center;gap:4px;"><div style="width:10px;height:10px;background:var(--yellow);border-radius:2px;"></div>Slightly off</div>
+      <div style="display:flex;align-items:center;gap:4px;"><div style="width:10px;height:10px;background:var(--red);border-radius:2px;"></div>Miscalibrated</div>
+    `;
+    labels.appendChild(legend);
+  } catch(e) {
+    chart.innerHTML = '<div class="empty-state" style="margin:auto;">Error loading calibration data</div>';
+  }
 }
 
 // ---- LOAD GAMES ----
