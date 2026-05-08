@@ -305,6 +305,105 @@ def update_results():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/update_closing_lines', methods=['POST'])
+def update_closing_lines():
+    if not sheets_service or not GOOGLE_SHEETS_ID:
+        return jsonify({'error': 'Sheets not configured'}), 500
+    
+    ODDS_KEY = '465c281c797b25ab75b326e3e0828a9f'
+    sport_keys = {
+        'NBA': 'basketball_nba',
+        'NFL': 'americanfootball_nfl',
+        'MLB': 'baseball_mlb',
+        'NHL': 'icehockey_nhl',
+        'EPL': 'soccer_epl',
+    }
+    
+    try:
+        # Read sheet
+        result = sheets_service.spreadsheets().values().get(
+            spreadsheetId=GOOGLE_SHEETS_ID,
+            range='Sheet1!A:K'
+        ).execute()
+        rows = result.get('values', [])
+        
+        # Find pending rows with no closing line yet
+        pending_by_sport = {}
+        for i, row in enumerate(rows[1:], start=2):
+            if len(row) < 9:
+                continue
+            sport = row[1]
+            if sport not in sport_keys:
+                continue
+            # Skip if closing line already set
+            if len(row) >= 11 and row[10] not in (None, '', 'None'):
+                continue
+            home_team = row[2]
+            away_team = row[3]
+            pending_by_sport.setdefault(sport, []).append({
+                'row_num': i,
+                'home_team': home_team,
+                'away_team': away_team,
+            })
+        
+        if not pending_by_sport:
+            return jsonify({'updated': 0, 'message': 'no pending closing lines'})
+        
+        updated = 0
+        for sport, entries in pending_by_sport.items():
+            try:
+                odds_url = f'https://api.the-odds-api.com/v4/sports/{sport_keys[sport]}/odds/?apiKey={ODDS_KEY}&regions=us&markets=h2h&oddsFormat=american'
+                r = requests.get(odds_url, timeout=10)
+                games = r.json()
+                if not isinstance(games, list):
+                    continue
+                
+                # Build lookup: home_team|away_team -> implied prob
+                odds_lookup = {}
+                for g in games:
+                    h = g.get('home_team', '')
+                    a = g.get('away_team', '')
+                    bookmakers = g.get('bookmakers', [])
+                    if not bookmakers:
+                        continue
+                    # Use first bookmaker (DraftKings/FanDuel typically)
+                    market = bookmakers[0].get('markets', [{}])[0]
+                    outcomes = market.get('outcomes', [])
+                    home_odds = next((o['price'] for o in outcomes if o['name'] == h), None)
+                    if home_odds is None:
+                        continue
+                    # Convert American odds to implied probability
+                    if home_odds > 0:
+                        implied = 100 / (home_odds + 100)
+                    else:
+                        implied = -home_odds / (-home_odds + 100)
+                    odds_lookup[f'{h}|{a}'] = implied
+                
+                # Update matching rows
+                for entry in entries:
+                    key = f'{entry["home_team"]}|{entry["away_team"]}'
+                    if key not in odds_lookup:
+                        continue
+                    closing_prob = round(odds_lookup[key] * 100, 1)
+                    sheets_service.spreadsheets().values().update(
+                        spreadsheetId=GOOGLE_SHEETS_ID,
+                        range=f'Sheet1!K{entry["row_num"]}',
+                        valueInputOption='RAW',
+                        body={'values': [[closing_prob]]}
+                    ).execute()
+                    updated += 1
+                    if updated >= 20:
+                        break
+            except Exception as e:
+                print(f"{sport} closing line error: {e}")
+            
+            if updated >= 20:
+                break
+        
+        return jsonify({'updated': updated})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/refresh_stats', methods=['POST'])
 def refresh_stats():
     if not sheets_service or not GOOGLE_SHEETS_ID:
