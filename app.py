@@ -98,6 +98,7 @@ def health():
             'cfb':          {'auc': 0.867, 'accuracy': 0.776},
             'nhl':          {'auc': 0.749, 'accuracy': 0.675},
             'epl':          {'auc': 0.707, 'accuracy': 0.579},
+            'tennis':       {'auc': 0.695, 'accuracy': 0.640},
         }
     })
 
@@ -843,6 +844,7 @@ def get_sports():
             {'key': 'cfb',           'name': 'College Football',       'auc': 0.867},
             {'key': 'nhl',           'name': 'NHL Hockey',             'auc': 0.749},
             {'key': 'epl',           'name': 'EPL Soccer',             'auc': 0.707},
+            {'key': 'tennis',        'name': 'ATP Tennis',             'auc': 0.695},
         ]
     })
 
