@@ -1377,7 +1377,7 @@ async function loadAllGames() {
   document.getElementById('games-container').innerHTML =
     '<div class="empty-state"><div class="spinner" style="width:20px;height:20px;margin:0 auto 12px;border-width:2px"></div><div style="margin-top:8px">Loading today\'s schedule...</div></div>';
   const today = new Date();
-  const dateStr = today.toISOString().split('T')[0];
+  const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
   document.getElementById('today-date').textContent =
     today.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}).toUpperCase();
   allGames = [];
