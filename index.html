@@ -1233,7 +1233,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
         </div>
       </div>
     </div>
-    <div class="sport-perf-grid" style="grid-template-columns:repeat(3,1fr);">
+    <div class="sport-perf-grid" style="grid-template-columns:repeat(4,1fr);">
       <div class="sport-perf-card">
         <div class="sport-perf-sport">🎓 College Basketball</div>
         <div class="sport-perf-auc">86.2%</div>
@@ -1396,15 +1396,41 @@ async function loadAllGames() {
       const games = await r.json();
       (games||[]).forEach(g => {
         let homeML=null, spread=null;
-        (g.bookmakers||[]).slice(0,1).forEach(bk => {
+        let bestHomePrice = null, bestHomeBook = null;
+        let bestAwayPrice = null, bestAwayBook = null;
+        (g.bookmakers||[]).forEach(bk => {
           (bk.markets||[]).forEach(mkt => {
-            if(mkt.key==='h2h'){const ho=mkt.outcomes.find(o=>o.name===g.home_team);if(ho)homeML=ho.price;}
-            if(mkt.key==='spreads'){const ho=mkt.outcomes.find(o=>o.name===g.home_team);if(ho)spread=ho.point;}
+            if(mkt.key==='h2h'){
+              const ho=mkt.outcomes.find(o=>o.name===g.home_team);
+              const aw=mkt.outcomes.find(o=>o.name===g.away_team);
+              if(ho){
+                if(homeML===null) homeML=ho.price;
+                // higher price = better for bettor (more profit per $)
+                if(bestHomePrice===null || ho.price > bestHomePrice){
+                  bestHomePrice = ho.price;
+                  bestHomeBook = bk.title;
+                }
+              }
+              if(aw){
+                if(bestAwayPrice===null || aw.price > bestAwayPrice){
+                  bestAwayPrice = aw.price;
+                  bestAwayBook = bk.title;
+                }
+              }
+            }
+            if(mkt.key==='spreads' && spread===null){
+              const ho=mkt.outcomes.find(o=>o.name===g.home_team);
+              if(ho)spread=ho.point;
+            }
           });
         });
         if(homeML!==null){
           const vp=homeML>0?100/(homeML+100):Math.abs(homeML)/(Math.abs(homeML)+100);
-          oddsMap[g.home_team+'|'+g.away_team]={vegasProb:vp,spread};
+          oddsMap[g.home_team+'|'+g.away_team]={
+            vegasProb:vp, spread,
+            bestHomePrice, bestHomeBook,
+            bestAwayPrice, bestAwayBook
+          };
         }
       });
     }));
@@ -1422,6 +1448,8 @@ async function loadAllGames() {
         homeTeam:ht, awayTeam:at,
         homeAbbr:g.home_team.abbreviation, awayAbbr:g.visitor_team.abbreviation,
         time:formatTime(g.status), spread:od.spread||null, vegasProb:od.vegasProb||null, modelProb:null,
+        bestHomePrice:od.bestHomePrice||null, bestHomeBook:od.bestHomeBook||null,
+        bestAwayPrice:od.bestAwayPrice||null, bestAwayBook:od.bestAwayBook||null,
         homeScore: g.home_team_score||null,
         awayScore: g.visitor_team_score||null,
       });
@@ -1460,6 +1488,8 @@ async function loadAllGames() {
           homeTeam:ht, awayTeam:at,
           homeAbbr:home?.team?.abbreviation||'', awayAbbr:away?.team?.abbreviation||'',
           time:formatTime(e.status?.type?.shortDetail||''), spread:od.spread||spread, vegasProb:od.vegasProb||vegasProb, modelProb:null,
+          bestHomePrice:od.bestHomePrice||null, bestHomeBook:od.bestHomeBook||null,
+          bestAwayPrice:od.bestAwayPrice||null, bestAwayBook:od.bestAwayBook||null,
           homeScore: parseInt(home?.score)||null,
           awayScore: parseInt(away?.score)||null,
         });
@@ -1649,6 +1679,7 @@ function buildExpanded(g, edge) {
       <div class="exp-row"><span class="exp-key">Vegas Home%</span><span class="exp-val">${vp!==null?vp+'%':'—'}</span></div>
       <div class="exp-row"><span class="exp-key">Model Home%</span><span class="exp-val ${mp>=60?'green':mp<40?'red':''}">${mp!==null?mp+'%':'—'}</span></div>
       <div class="exp-row"><span class="exp-key">Edge</span><span class="exp-val ${edge>5?'green':edge<-5?'red':''}">${edge!==null?(edge>0?'+':'')+edge+'%':'—'}</span></div>
+      ${g.bestHomePrice!==null && mp!==null ? `<div class="exp-row"><span class="exp-key">Best Line</span><span class="exp-val green">${mp>=50?(g.bestHomePrice>0?'+':'')+g.bestHomePrice+' '+g.homeAbbr+' @ '+g.bestHomeBook:(g.bestAwayPrice>0?'+':'')+g.bestAwayPrice+' '+g.awayAbbr+' @ '+g.bestAwayBook}</span></div>`:''}
     </div>
     <div>
       <div class="exp-section-title">Model Info</div>
