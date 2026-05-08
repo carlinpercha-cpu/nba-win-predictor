@@ -834,7 +834,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
 .compare-cell.header { background: var(--card); color: var(--text3); font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
 .compare-cell.green { color: var(--green); font-weight: 600; }
 
-.sport-perf-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.sport-perf-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .sport-perf-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -1158,11 +1158,13 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
       </div>
       <button class="refresh-btn" onclick="loadRecord()">↻ Refresh</button>
     </div>
-    <div id="record-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
+    <div id="record-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;">
       <div class="sport-perf-card"><div class="sport-perf-sport">Total Predictions</div><div class="sport-perf-auc" id="rec-total">—</div></div>
       <div class="sport-perf-card"><div class="sport-perf-sport">Decided</div><div class="sport-perf-auc" id="rec-decided">—</div></div>
-      <div class="sport-perf-card"><div class="sport-perf-sport">Correct</div><div class="sport-perf-auc" id="rec-correct">—</div></div>
       <div class="sport-perf-card"><div class="sport-perf-sport">Accuracy</div><div class="sport-perf-auc" id="rec-acc">—</div></div>
+      <div class="sport-perf-card"><div class="sport-perf-sport">Avg CLV</div><div class="sport-perf-auc" id="rec-clv">—</div><div class="sport-perf-acc" id="rec-clv-sample">—</div></div>
+      <div class="sport-perf-card"><div class="sport-perf-sport">Beat Closing %</div><div class="sport-perf-auc" id="rec-clv-pct">—</div><div class="sport-perf-acc">% predictions beating close</div></div>
+      <div class="sport-perf-card"><div class="sport-perf-sport">Correct</div><div class="sport-perf-auc" id="rec-correct">—</div></div>
     </div>
     <div id="record-table" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;overflow-x:auto;">
       <div class="empty-state">Loading record...</div>
@@ -1936,6 +1938,20 @@ async function loadRecord() {
     document.getElementById('rec-decided').textContent = d.decided || 0;
     document.getElementById('rec-correct').textContent = d.correct || 0;
     document.getElementById('rec-acc').textContent = d.accuracy !== null ? d.accuracy + '%' : '—';
+    const clvEl = document.getElementById('rec-clv');
+    const clvPctEl = document.getElementById('rec-clv-pct');
+    const clvSampleEl = document.getElementById('rec-clv-sample');
+    if (d.avg_clv !== null && d.avg_clv !== undefined) {
+      clvEl.textContent = (d.avg_clv > 0 ? '+' : '') + d.avg_clv + '%';
+      clvEl.style.color = d.avg_clv > 0 ? 'var(--green)' : d.avg_clv < 0 ? 'var(--red)' : '';
+      clvSampleEl.textContent = `n=${d.clv_count} games`;
+      clvPctEl.textContent = d.clv_positive_pct + '%';
+      clvPctEl.style.color = d.clv_positive_pct > 50 ? 'var(--green)' : d.clv_positive_pct < 50 ? 'var(--red)' : '';
+    } else {
+      clvEl.textContent = '—';
+      clvSampleEl.textContent = 'awaiting closing lines';
+      clvPctEl.textContent = '—';
+    }
     const preds = (d.predictions || []).reverse();
     if (!preds.length) { tbl.innerHTML = '<div class="empty-state">No predictions logged yet</div>'; return; }
     let html = '<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="border-bottom:1px solid var(--border);color:var(--text3);text-align:left;"><th style="padding:8px">Date</th><th style="padding:8px">Sport</th><th style="padding:8px">Matchup</th><th style="padding:8px">Pick</th><th style="padding:8px">Confidence</th><th style="padding:8px">Result</th></tr></thead><tbody>';
