@@ -256,6 +256,56 @@ def get_record():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/calibration', methods=['GET'])
+def get_calibration():
+    if not sheets_service or not GOOGLE_SHEETS_ID:
+        return jsonify({'error': 'Sheets not configured'}), 500
+    try:
+        result = sheets_service.spreadsheets().values().get(
+            spreadsheetId=GOOGLE_SHEETS_ID,
+            range='Sheet1!A:I'
+        ).execute()
+        rows = result.get('values', [])
+        
+        # Bin predictions by confidence level
+        bins = [(0, 50), (50, 55), (55, 60), (60, 65), (65, 70), (70, 80), (80, 100)]
+        bin_data = [{'low': lo, 'high': hi, 'predicted_avg': 0, 'actual_winrate': 0, 'count': 0, 'wins': 0} for lo, hi in bins]
+        
+        for row in rows[1:]:
+            if len(row) < 9 or row[8] == 'pending':
+                continue
+            try:
+                # Use the predicted side's confidence
+                home_prob = float(row[4])
+                away_prob = float(row[5])
+                prediction = row[6]
+                result_actual = row[8]
+                # Confidence on the side we picked
+                conf = home_prob if prediction == 'home' else away_prob
+                won = 1 if prediction == result_actual else 0
+                
+                for i, (lo, hi) in enumerate(bins):
+                    if lo <= conf < hi or (hi == 100 and conf == 100):
+                        bin_data[i]['count'] += 1
+                        bin_data[i]['wins'] += won
+                        bin_data[i]['predicted_avg'] += conf
+                        break
+            except (ValueError, IndexError):
+                continue
+        
+        # Calculate averages
+        for b in bin_data:
+            if b['count'] > 0:
+                b['predicted_avg'] = round(b['predicted_avg'] / b['count'], 1)
+                b['actual_winrate'] = round(b['wins'] / b['count'] * 100, 1)
+            else:
+                b['predicted_avg'] = (b['low'] + b['high']) / 2
+                b['actual_winrate'] = None
+        
+        return jsonify({'calibration': bin_data})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/update_results', methods=['POST'])
 def update_results():
     if not sheets_service or not GOOGLE_SHEETS_ID:
