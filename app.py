@@ -32,7 +32,7 @@ try:
 except Exception as e:
     print(f"Google Sheets failed: {e}")
 
-def log_prediction(sport, home_team, away_team, home_prob, away_prob, game_id):
+def log_prediction(sport, home_team, away_team, home_prob, away_prob, game_id, vegas_prob=None):
     if not sheets_service or not GOOGLE_SHEETS_ID:
         return
     try:
@@ -54,11 +54,13 @@ def log_prediction(sport, home_team, away_team, home_prob, away_prob, game_id):
             round(away_prob * 100, 1),
             'home' if home_prob > 0.5 else 'away',
             game_id,
-            'pending'
+            'pending',
+            round(vegas_prob * 100, 1) if vegas_prob else '',
+            ''  # closing line filled in later
         ]
         sheets_service.spreadsheets().values().append(
             spreadsheetId=GOOGLE_SHEETS_ID,
-            range='Sheet1!A:I',
+            range='Sheet1!A:K',
             valueInputOption='RAW',
             body={'values': [row]}
         ).execute()
@@ -127,7 +129,8 @@ def predict():
         home_team = data.get('home_team', '')
         away_team = data.get('away_team', '')
         if game_id and home_team and away_team:
-            log_prediction(sport, home_team, away_team, float(prob), 1-float(prob), game_id)
+            vegas_prob = data.get('vegas_prob') or data.get('Vegas_WinProb') or data.get('vegas_home_prob') or data.get('elo_win_prob') or data.get('BARTHAG')
+            log_prediction(sport, home_team, away_team, float(prob), 1-float(prob), game_id, vegas_prob=float(vegas_prob) if vegas_prob else None)
 
         return jsonify({
             'sport': sport,
