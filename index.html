@@ -942,6 +942,10 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
         <div class="sport-row-left"><span class="sport-row-icon">⚽</span><span class="sport-row-name">EPL Soccer</span></div>
         <span class="sport-row-count" id="cnt-epl">0</span>
       </div>
+      <div class="sport-row" onclick="filterSport('tennis')" data-sport="tennis">
+        <div class="sport-row-left"><span class="sport-row-icon">🎾</span><span class="sport-row-name">ATP Tennis</span></div>
+        <span class="sport-row-count" id="cnt-tennis">0</span>
+      </div>
       <div class="sidebar-divider"></div>
       <div class="sidebar-section-label" style="margin-top:4px">Model Accuracy</div>
       <div class="model-row"><span class="model-row-name">CFB</span><div class="model-row-right"><div class="model-auc-bar"><div class="model-auc-fill" style="width:86.7%"></div></div><span class="model-auc-val">0.867</span></div></div>
@@ -1474,7 +1478,8 @@ async function loadAllGames() {
   try {
     const oddsReqs = [
       ['baseball_mlb','mlb'],['basketball_nba','nba'],
-      ['americanfootball_nfl','nfl'],['icehockey_nhl','nhl']
+      ['americanfootball_nfl','nfl'],['icehockey_nhl','nhl'],
+      ['soccer_epl','epl'],['tennis_atp_singles','tennis']
     ];
     await Promise.allSettled(oddsReqs.map(async ([apiSport,key]) => {
       const r = await fetch(`https://api.the-odds-api.com/v4/sports/${apiSport}/odds/?apiKey=${ODDS_KEY}&regions=us&markets=h2h,spreads&oddsFormat=american`);
@@ -1540,6 +1545,45 @@ async function loadAllGames() {
       });
     });
   } catch(e) {}
+  // Tennis from Odds API (no ESPN equivalent for tennis schedule)
+  try {
+    const r = await fetch(`https://api.the-odds-api.com/v4/sports/tennis_atp_singles/odds/?apiKey=${ODDS_KEY}&regions=us&markets=h2h&oddsFormat=american`);
+    const tennisGames = await r.json();
+    (tennisGames||[]).forEach(g => {
+      const today = new Date().toISOString().split('T')[0];
+      if (!g.commence_time || !g.commence_time.startsWith(today)) return;
+      const player_a = g.home_team;
+      const player_b = g.away_team;
+      let bestA = null, bestB = null, bookA = null, bookB = null, vegasProb = null;
+      (g.bookmakers||[]).forEach(bk => {
+        const market = bk.markets?.find(m => m.key === 'h2h');
+        if (!market) return;
+        const oA = market.outcomes.find(o => o.name === player_a);
+        const oB = market.outcomes.find(o => o.name === player_b);
+        if (oA && (bestA === null || oA.price > bestA)) { bestA = oA.price; bookA = bk.title; }
+        if (oB && (bestB === null || oB.price > bestB)) { bestB = oB.price; bookB = bk.title; }
+        if (oA && vegasProb === null) {
+          vegasProb = oA.price > 0 ? 100/(oA.price+100) : Math.abs(oA.price)/(Math.abs(oA.price)+100);
+        }
+      });
+      const time = new Date(g.commence_time).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'});
+      allGames.push({
+        id: 'tennis_' + g.id,
+        sport: 'tennis',
+        homeTeam: player_a,
+        awayTeam: player_b,
+        homeAbbr: player_a.split(' ').pop().substring(0,3).toUpperCase(),
+        awayAbbr: player_b.split(' ').pop().substring(0,3).toUpperCase(),
+        time: time,
+        spread: null,
+        vegasProb: vegasProb,
+        modelProb: null,
+        bestHomePrice: bestA, bestHomeBook: bookA,
+        bestAwayPrice: bestB, bestAwayBook: bookB,
+        homeScore: null, awayScore: null
+      });
+    });
+  } catch(e) { console.error('Tennis fetch error', e); }
 
   // ESPN sports
   for (const [sport, league, key] of [
@@ -1635,6 +1679,7 @@ function buildPayload(g) {
     const as = (window.teamStats||{})['EPL|'+g.awayTeam] || {last5_winrate:0.5,last10_winrate:0.5};
     Object.assign(p,{vegas_prob:v,last5_goals_for:1.5,last10_goals_for:1.5,last5_goals_against:1.3,last10_goals_against:1.3,last5_goal_diff:0,last10_goal_diff:0,last5_shots_for:12,last10_shots_for:12,last5_sot_for:4,last10_sot_for:4,last5_win:hs.last5_winrate,last10_win:hs.last10_winrate,win_streak:0,opp_last5_goals_for:1.5,opp_last10_goals_for:1.5,opp_last5_goals_against:1.3,opp_last10_goals_against:1.3,opp_last5_goal_diff:0,opp_last10_goal_diff:0,opp_last5_win:as.last5_winrate,opp_last10_win:as.last10_winrate,opp_win_streak:0,goal_diff_matchup:0,form_diff:hs.last5_winrate-as.last5_winrate});
   }
+  else if (g.sport==='tennis') Object.assign(p,{a_last5_winrate:0.5,a_last10_winrate:0.5,a_last20_winrate:0.5,a_surface_winrate:0.5,a_matches_played:50,b_last5_winrate:0.5,b_last10_winrate:0.5,b_last20_winrate:0.5,b_surface_winrate:0.5,b_matches_played:50,player_a_age:27,player_b_age:27,player_a_ht:185,player_b_ht:185,player_a_seed:99,player_b_seed:99,winrate_diff:(v-0.5)*0.4,surface_winrate_diff:(v-0.5)*0.4,age_diff:0,ht_diff:0,seed_diff:0,exp_diff:0});
   else if (g.sport==='nhl') {
     const hs = (window.teamStats||{})['NHL|'+g.homeTeam] || {last5_winrate:0.5};
     Object.assign(p,{pre_game_point_pct:.5+((v-.5)*.3),opp_point_pct:.5-((v-.5)*.3),point_pct_diff:(v-.5)*.6,last5_winrate:hs.last5_winrate,last5_goals_for:3.0,last5_goals_against:3.0});
@@ -1644,7 +1689,7 @@ function buildPayload(g) {
 
 function updateCounts() {
   const counts = { all: allGames.length };
-  ['nba','nfl','mlb','nhl','ncaab','cfb','epl'].forEach(s => counts[s] = allGames.filter(g=>g.sport===s).length);
+  ['nba','nfl','mlb','nhl','ncaab','cfb','epl','tennis'].forEach(s => counts[s] = allGames.filter(g=>g.sport===s).length);
   Object.entries(counts).forEach(([k,v]) => { const el=document.getElementById('cnt-'+k); if(el) el.textContent=v; });
   document.getElementById('game-badge').textContent = counts.all;
 }
@@ -1666,9 +1711,9 @@ function filterSport(sport) {
   renderGames();
 }
 
-const SPORT_LABELS = {nba:'🏀 NBA',nfl:'🏈 NFL',mlb:'⚾ MLB',nhl:'🏒 NHL',ncaab:'🎓 College Basketball',cfb:'🏟️ College Football',epl:'⚽ EPL Soccer'};
-const MODEL_AUC = {nba:0.727,nfl:0.788,mlb:0.617,ncaab:0.862,cfb:0.867,nhl:0.749,epl:0.707};
-const HOME_ADV = {nba:'58.8%',nfl:'53.3%',mlb:'54.4%',ncaab:'74.3%',cfb:'57.9%',nhl:'53.6%',epl:'45.5%'};
+const SPORT_LABELS = {nba:'🏀 NBA',nfl:'🏈 NFL',mlb:'⚾ MLB',nhl:'🏒 NHL',ncaab:'🎓 College Basketball',cfb:'🏟️ College Football',epl:'⚽ EPL Soccer',tennis:'🎾 ATP Tennis'};
+const MODEL_AUC = {nba:0.727,nfl:0.788,mlb:0.617,ncaab:0.862,cfb:0.867,nhl:0.749,epl:0.707,tennis:0.695};
+const HOME_ADV = {nba:'58.8%',nfl:'53.3%',mlb:'54.4%',ncaab:'74.3%',cfb:'57.9%',nhl:'53.6%',epl:'45.5%',tennis:'N/A'};
 
 function renderGames() {
   let filtered = currentFilter==='all' ? allGames : allGames.filter(g=>g.sport===currentFilter);
