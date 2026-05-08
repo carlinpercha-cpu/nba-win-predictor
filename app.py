@@ -36,6 +36,15 @@ def log_prediction(sport, home_team, away_team, home_prob, away_prob, game_id):
     if not sheets_service or not GOOGLE_SHEETS_ID:
         return
     try:
+        # Check if this game_id is already logged
+        existing = sheets_service.spreadsheets().values().get(
+            spreadsheetId=GOOGLE_SHEETS_ID,
+            range='Sheet1!H:H'
+        ).execute().get('values', [])
+        existing_ids = {row[0] for row in existing[1:] if row}
+        if game_id in existing_ids:
+            return  # already logged, skip
+        
         row = [
             datetime.utcnow().strftime('%Y-%m-%d'),
             sport.upper(),
@@ -45,7 +54,7 @@ def log_prediction(sport, home_team, away_team, home_prob, away_prob, game_id):
             round(away_prob * 100, 1),
             'home' if home_prob > 0.5 else 'away',
             game_id,
-            'pending'  # result updated later
+            'pending'
         ]
         sheets_service.spreadsheets().values().append(
             spreadsheetId=GOOGLE_SHEETS_ID,
@@ -55,7 +64,7 @@ def log_prediction(sport, home_team, away_team, home_prob, away_prob, game_id):
         ).execute()
     except Exception as e:
         print(f"Sheets log error: {e}")
-
+        
 def load_model(sport):
     model    = joblib.load(os.path.join(MODEL_DIR, f'{sport}_model.pkl'))
     scaler   = joblib.load(os.path.join(MODEL_DIR, f'{sport}_scaler.pkl'))
