@@ -197,12 +197,32 @@ def get_record():
     try:
         result = sheets_service.spreadsheets().values().get(
             spreadsheetId=GOOGLE_SHEETS_ID,
-            range='Sheet1!A:I'
+            range='Sheet1!A:K'
         ).execute()
         rows = result.get('values', [])
         predictions = []
+        clv_values = []
         for row in rows[1:]:
             if len(row) >= 9:
+                vegas_at_pred = row[9] if len(row) >= 10 and row[9] not in ('', None) else None
+                closing_line = row[10] if len(row) >= 11 and row[10] not in ('', None) else None
+                
+                # Calculate CLV: positive if model picked side that line moved toward
+                clv = None
+                if vegas_at_pred and closing_line:
+                    try:
+                        v_pred = float(vegas_at_pred)
+                        v_close = float(closing_line)
+                        model_pick_home = float(row[4]) > 50
+                        # If model picked home and home % rose at close = positive CLV
+                        if model_pick_home:
+                            clv = round(v_close - v_pred, 1)
+                        else:
+                            clv = round(v_pred - v_close, 1)
+                        clv_values.append(clv)
+                    except (ValueError, TypeError):
+                        pass
+                
                 predictions.append({
                     'date': row[0],
                     'sport': row[1],
@@ -212,16 +232,26 @@ def get_record():
                     'away_prob': row[5],
                     'prediction': row[6],
                     'game_id': row[7],
-                    'result': row[8]
+                    'result': row[8],
+                    'vegas_at_pred': vegas_at_pred,
+                    'closing_line': closing_line,
+                    'clv': clv
                 })
+        
         correct = sum(1 for p in predictions if p['result'] == p['prediction'])
         total_decided = sum(1 for p in predictions if p['result'] != 'pending')
+        avg_clv = round(sum(clv_values) / len(clv_values), 2) if clv_values else None
+        positive_clv = sum(1 for c in clv_values if c > 0)
+        
         return jsonify({
             'predictions': predictions,
             'total': len(predictions),
             'decided': total_decided,
             'correct': correct,
-            'accuracy': round(correct/total_decided*100, 1) if total_decided > 0 else None
+            'accuracy': round(correct/total_decided*100, 1) if total_decided > 0 else None,
+            'avg_clv': avg_clv,
+            'clv_count': len(clv_values),
+            'clv_positive_pct': round(positive_clv/len(clv_values)*100, 1) if clv_values else None
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
