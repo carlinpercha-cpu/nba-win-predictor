@@ -1479,6 +1479,15 @@ async function runPredictions() {
       const d = await r.json();
       if (d && typeof d.win_probability === 'number' && !isNaN(d.win_probability)) {
         g.modelProb = d.win_probability;
+        // NBA playoff fallback: if model disagrees with Vegas by >30%, blend toward Vegas
+        // Postseason rolling stats hover near 50% which causes spurious large edges
+        if (g.sport === 'nba' && g.vegasProb !== null) {
+          const edge = Math.abs(g.modelProb - g.vegasProb);
+          if (edge > 0.30) {
+            g.modelProb = g.vegasProb * 0.7 + g.modelProb * 0.3;
+            g.playoffAdjusted = true;
+          }
+        }
       } else {
         g.modelProb = null;
       }
