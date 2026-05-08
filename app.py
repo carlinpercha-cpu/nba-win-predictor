@@ -64,7 +64,7 @@ def log_prediction(sport, home_team, away_team, home_prob, away_prob, game_id):
         ).execute()
     except Exception as e:
         print(f"Sheets log error: {e}")
-        
+
 def load_model(sport):
     model    = joblib.load(os.path.join(MODEL_DIR, f'{sport}_model.pkl'))
     scaler   = joblib.load(os.path.join(MODEL_DIR, f'{sport}_scaler.pkl'))
@@ -255,22 +255,40 @@ def update_results():
                 continue
             sport_path, league = sport_apis[sport]
             try:
-                espn_id = game_id.split('_')[1] if '_' in game_id else game_id
-                r = requests.get(f'https://site.api.espn.com/apis/site/v2/sports/{sport_path}/{league}/summary?event={espn_id}', timeout=8)
-                d = r.json()
-                comp = d.get('header', {}).get('competitions', [{}])[0]
-                status = comp.get('status', {}).get('type', {}).get('completed', False)
-                if not status:
-                    skipped += 1
-                    continue
-                competitors = comp.get('competitors', [])
-                home = next((c for c in competitors if c.get('homeAway') == 'home'), None)
-                away = next((c for c in competitors if c.get('homeAway') == 'away'), None)
-                if not home or not away:
-                    continue
-                home_score = int(home.get('score', 0))
-                away_score = int(away.get('score', 0))
-                actual_winner = 'home' if home_score > away_score else 'away'
+                bdl_id = game_id.split('_')[1] if '_' in game_id else game_id
+                
+                if sport == 'NBA':
+                    # Use BallDontLie API for NBA
+                    r = requests.get(
+                        f'https://api.balldontlie.io/v1/games/{bdl_id}',
+                        headers={'Authorization': '0a853bd2-7b7d-48f8-9bb4-aa7f6e74a613'},
+                        timeout=8
+                    )
+                    d = r.json()
+                    g = d.get('data', {})
+                    if g.get('status') != 'Final':
+                        skipped += 1
+                        continue
+                    home_score = g.get('home_team_score', 0)
+                    away_score = g.get('visitor_team_score', 0)
+                    actual_winner = 'home' if home_score > away_score else 'away'
+                else:
+                    # ESPN for everything else
+                    r = requests.get(f'https://site.api.espn.com/apis/site/v2/sports/{sport_path}/{league}/summary?event={bdl_id}', timeout=8)
+                    d = r.json()
+                    comp = d.get('header', {}).get('competitions', [{}])[0]
+                    status = comp.get('status', {}).get('type', {}).get('completed', False)
+                    if not status:
+                        skipped += 1
+                        continue
+                    competitors = comp.get('competitors', [])
+                    home = next((c for c in competitors if c.get('homeAway') == 'home'), None)
+                    away = next((c for c in competitors if c.get('homeAway') == 'away'), None)
+                    if not home or not away:
+                        continue
+                    home_score = int(home.get('score', 0))
+                    away_score = int(away.get('score', 0))
+                    actual_winner = 'home' if home_score > away_score else 'away'
                 sheets_service.spreadsheets().values().update(
                     spreadsheetId=GOOGLE_SHEETS_ID,
                     range=f'Sheet1!I{i}',
