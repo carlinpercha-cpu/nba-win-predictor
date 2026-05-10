@@ -29,7 +29,25 @@ MODEL_DIR = os.path.join(os.path.dirname(__file__), 'models')
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 GOOGLE_SHEETS_ID = os.environ.get('GOOGLE_SHEETS_ID', '')
 GOOGLE_SERVICE_ACCOUNT = os.environ.get('GOOGLE_SERVICE_ACCOUNT', '')
-ODDS_API_KEY = os.environ.get('ODDS_API_KEY', '465c281c797b25ab75b326e3e0828a9f')
+# Comma-separated list of API keys for fallback
+ODDS_API_KEYS = os.environ.get('ODDS_API_KEYS', '465c281c797b25ab75b326e3e0828a9f').split(',')
+ODDS_API_KEY = ODDS_API_KEYS[0]  # for backward compat with existing code
+
+def fetch_odds_with_fallback(url):
+    """Try each API key until one works. Returns response or raises."""
+    last_err = None
+    for key in ODDS_API_KEYS:
+        try:
+            full_url = url.replace(f'apiKey={ODDS_API_KEY}', f'apiKey={key.strip()}') if 'apiKey=' in url else url
+            r = requests.get(full_url, timeout=10)
+            if r.status_code in (401, 429):
+                print(f"Odds key exhausted, trying next...")
+                continue
+            return r
+        except Exception as e:
+            last_err = e
+            continue
+    raise last_err or Exception('All odds API keys exhausted')
 BDL_API_KEY = os.environ.get('BDL_API_KEY', '0a853bd2-7b7d-48f8-9bb4-aa7f6e74a613')
 
 # Single source of truth for model stats - update here when retraining

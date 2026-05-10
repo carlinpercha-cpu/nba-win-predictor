@@ -1200,9 +1200,33 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
 const API = 'https://nba-win-predictor-airk.onrender.com';
 // BallDontLie free tier - exposing is fine since they don't restrict by origin
 const BDL_KEY = '0a853bd2-7b7d-48f8-9bb4-aa7f6e74a613';
-// Odds API - rate limited per key not per IP, exposing burns through monthly quota faster
-// TODO: move to backend proxy to protect quota
-const ODDS_KEY = '465c281c797b25ab75b326e3e0828a9f';
+// Two Odds API keys for redundancy - if one hits its monthly limit, fall back to the other
+const ODDS_KEYS = [
+  'f5228ede18515539494e1de666d26624',  // Primary
+  '6a7222fc546c534d585f366a65390599',  // Fallback
+];
+let activeOddsKeyIndex = 0;
+const ODDS_KEY = ODDS_KEYS[activeOddsKeyIndex];
+
+// Helper that retries with the next key on 401
+async function fetchOdds(url) {
+  for (let i = 0; i < ODDS_KEYS.length; i++) {
+    const idx = (activeOddsKeyIndex + i) % ODDS_KEYS.length;
+    const fullUrl = url.replace(/apiKey=[^&]+/, `apiKey=${ODDS_KEYS[idx]}`);
+    try {
+      const r = await fetch(fullUrl);
+      if (r.status === 401 || r.status === 429) {
+        console.warn(`Odds API key ${idx} exhausted, trying next...`);
+        continue;
+      }
+      activeOddsKeyIndex = idx;  // remember which key worked
+      return r;
+    } catch(e) {
+      console.warn(`Odds API key ${idx} failed:`, e);
+    }
+  }
+  throw new Error('All Odds API keys exhausted');
+}
 function renderMd(t) {
   if (!t) return '';
   return t
@@ -1367,7 +1391,7 @@ async function loadAllGames() {
       ['soccer_epl','epl']
     ];
     await Promise.allSettled(oddsReqs.map(async ([apiSport,key]) => {
-      const r = await fetch(`https://api.the-odds-api.com/v4/sports/${apiSport}/odds/?apiKey=${ODDS_KEY}&regions=us&markets=h2h,spreads&oddsFormat=american`);
+      const r = await fetchOdds(`https://api.the-odds-api.com/v4/sports/${apiSport}/odds/?apiKey=${ODDS_KEY}&regions=us&markets=h2h,spreads&oddsFormat=american`);
       const games = await r.json();
       (games||[]).forEach(g => {
         let spread=null;
@@ -1437,14 +1461,14 @@ async function loadAllGames() {
   // Tennis from Odds API (no ESPN equivalent for tennis schedule)
   try {
     // Fetch all active tennis tournaments dynamically
-    const sportsListResp = await fetch(`https://api.the-odds-api.com/v4/sports/?apiKey=${ODDS_KEY}`);
+    const sportsListResp = await fetchOdds(`https://api.the-odds-api.com/v4/sports/?apiKey=${ODDS_KEY}`);
     const sportsList = await sportsListResp.json();
     const tennisKeys = (sportsList||[]).filter(s => s.key?.startsWith('tennis_') && s.active && !s.has_outrights).map(s => s.key);
     
     const tennisGames = [];
     for (const tkey of tennisKeys) {
       try {
-        const tr = await fetch(`https://api.the-odds-api.com/v4/sports/${tkey}/odds/?apiKey=${ODDS_KEY}&regions=us&markets=h2h&oddsFormat=american`);
+        const tr = await fetchOdds(`https://api.the-odds-api.com/v4/sports/${tkey}/odds/?apiKey=${ODDS_KEY}&regions=us&markets=h2h&oddsFormat=american`);
         const tg = await tr.json();
         if (Array.isArray(tg)) tennisGames.push(...tg);
       } catch(e) {}
