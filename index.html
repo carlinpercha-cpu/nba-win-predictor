@@ -1316,7 +1316,10 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
 
 <script>
 const API = 'https://nba-win-predictor-airk.onrender.com';
+// BallDontLie free tier - exposing is fine since they don't restrict by origin
 const BDL_KEY = '0a853bd2-7b7d-48f8-9bb4-aa7f6e74a613';
+// Odds API - rate limited per key not per IP, exposing burns through monthly quota faster
+// TODO: move to backend proxy to protect quota
 const ODDS_KEY = '465c281c797b25ab75b326e3e0828a9f';
 function renderMd(t) {
   if (!t) return '';
@@ -1330,7 +1333,7 @@ function renderMd(t) {
     .replace(/\n\n/g,'<br><br>')
     .replace(/\n/g,'<br>');
 }
-let anthropicKey = localStorage.getItem('edge_api_key') || '';
+
 let allGames = [];
 let currentFilter = 'all';
 let analyzerSport = 'nba';
@@ -1357,11 +1360,6 @@ document.addEventListener('DOMContentLoaded', () => {
   loadAllGames();
   populateTeamSelects('nba');
 });
-
-function promptKey() {
-  const k = prompt('Enter your Anthropic API key for AI analysis (starts with sk-ant-):');
-  if (k && k.startsWith('sk-ant-')) { anthropicKey = k; localStorage.setItem('edge_api_key', k); }
-}
 
 async function checkAPI() {
   try {
@@ -1462,9 +1460,12 @@ function formatTime(t) {
 async function loadAllGames() {
   // Fetch team stats first
   try {
-    const tsResp = await fetch(API + '/team_stats');
+    const tsResp = await fetchWithRetry(API + '/team_stats');
     window.teamStats = await tsResp.json();
-  } catch(e) { window.teamStats = {}; }
+  } catch(e) { 
+    console.warn('Failed to load team stats, using defaults:', e);
+    window.teamStats = {}; 
+  }
   document.getElementById('games-container').innerHTML =
     '<div class="empty-state"><div class="spinner" style="width:20px;height:20px;margin:0 auto 12px;border-width:2px"></div><div style="margin-top:8px">Loading today\'s schedule...</div></div>';
   const today = new Date();
@@ -1479,23 +1480,24 @@ async function loadAllGames() {
     const oddsReqs = [
       ['baseball_mlb','mlb'],['basketball_nba','nba'],
       ['americanfootball_nfl','nfl'],['icehockey_nhl','nhl'],
-      ['soccer_epl','epl'],['tennis_atp_singles','tennis']
+      ['soccer_epl','epl']
     ];
     await Promise.allSettled(oddsReqs.map(async ([apiSport,key]) => {
       const r = await fetch(`https://api.the-odds-api.com/v4/sports/${apiSport}/odds/?apiKey=${ODDS_KEY}&regions=us&markets=h2h,spreads&oddsFormat=american`);
       const games = await r.json();
       (games||[]).forEach(g => {
-        let homeML=null, spread=null;
+        let spread=null;
         let bestHomePrice = null, bestHomeBook = null;
         let bestAwayPrice = null, bestAwayBook = null;
+        const homeImpliedProbs = [];
         (g.bookmakers||[]).forEach(bk => {
           (bk.markets||[]).forEach(mkt => {
             if(mkt.key==='h2h'){
               const ho=mkt.outcomes.find(o=>o.name===g.home_team);
               const aw=mkt.outcomes.find(o=>o.name===g.away_team);
               if(ho){
-                if(homeML===null) homeML=ho.price;
-                // higher price = better for bettor (more profit per $)
+                const implied = ho.price>0 ? 100/(ho.price+100) : Math.abs(ho.price)/(Math.abs(ho.price)+100);
+                homeImpliedProbs.push(implied);
                 if(bestHomePrice===null || ho.price > bestHomePrice){
                   bestHomePrice = ho.price;
                   bestHomeBook = bk.title;
@@ -1514,8 +1516,11 @@ async function loadAllGames() {
             }
           });
         });
-        if(homeML!==null){
-          const vp=homeML>0?100/(homeML+100):Math.abs(homeML)/(Math.abs(homeML)+100);
+        if(homeImpliedProbs.length > 0){
+          // Use median of all bookmakers for sharper Vegas line
+          const sorted = [...homeImpliedProbs].sort((a,b) => a-b);
+          const mid = Math.floor(sorted.length / 2);
+          const vp = sorted.length % 2 === 0 ? (sorted[mid-1]+sorted[mid])/2 : sorted[mid];
           oddsMap[g.home_team+'|'+g.away_team]={
             vegasProb:vp, spread,
             bestHomePrice, bestHomeBook,
@@ -1644,11 +1649,29 @@ async function loadAllGames() {
   updateChatCtx();
 }
 
+// Helper: fetch with one retry after a delay (handles Render cold starts)
+async function fetchWithRetry(url, options, retries = 1) {
+  try {
+    const r = await fetch(url, options);
+    if (!r.ok && r.status >= 500 && retries > 0) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      return fetchWithRetry(url, options, retries - 1);
+    }
+    return r;
+  } catch (e) {
+    if (retries > 0) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      return fetchWithRetry(url, options, retries - 1);
+    }
+    throw e;
+  }
+}
+
 async function runPredictions() {
   await Promise.allSettled(allGames.map(async g => {
     try {
       const payload = buildPayload(g);
-      const r = await fetch(API+'/predict',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      const r = await fetchWithRetry(API+'/predict',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
       const d = await r.json();
       if (d && typeof d.win_probability === 'number' && !isNaN(d.win_probability)) {
         g.modelProb = d.win_probability;
