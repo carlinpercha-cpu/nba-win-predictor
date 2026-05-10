@@ -948,14 +948,7 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
       </div>
       <div class="sidebar-divider"></div>
       <div class="sidebar-section-label" style="margin-top:4px">Model Accuracy</div>
-      <div class="model-row"><span class="model-row-name">CFB</span><div class="model-row-right"><div class="model-auc-bar"><div class="model-auc-fill" style="width:86.7%"></div></div><span class="model-auc-val">0.867</span></div></div>
-      <div class="model-row"><span class="model-row-name">NCAAB</span><div class="model-row-right"><div class="model-auc-bar"><div class="model-auc-fill" style="width:86.2%"></div></div><span class="model-auc-val">0.862</span></div></div>
-      <div class="model-row"><span class="model-row-name">NHL</span><div class="model-row-right"><div class="model-auc-bar"><div class="model-auc-fill" style="width:74.9%"></div></div><span class="model-auc-val">0.749</span></div></div>
-      <div class="model-row"><span class="model-row-name">NBA</span><div class="model-row-right"><div class="model-auc-bar"><div class="model-auc-fill" style="width:72.7%"></div></div><span class="model-auc-val">0.727</span></div></div>
-      <div class="model-row"><span class="model-row-name">NFL</span><div class="model-row-right"><div class="model-auc-bar"><div class="model-auc-fill" style="width:78.8%"></div></div><span class="model-auc-val">0.788</span></div></div>
-      <div class="model-row"><span class="model-row-name">MLB</span><div class="model-row-right"><div class="model-auc-bar"><div class="model-auc-fill" style="width:61.7%"></div></div><span class="model-auc-val">0.617</span></div></div>
-      <div class="model-row"><span class="model-row-name">EPL</span><div class="model-row-right"><div class="model-auc-bar"><div class="model-auc-fill" style="width:70.7%"></div></div><span class="model-auc-val">0.707</span></div></div>
-
+      <div id="model-accuracy-bars"></div>
       <div class="sidebar-divider"></div>
       <div class="sidebar-section-label" style="margin-top:4px">Legend</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>Model edge ≥5% vs Vegas</div>
@@ -1196,119 +1189,8 @@ body { background:var(--bg); color:var(--text); font-family:var(--font); font-si
       <div id="calibration-labels" style="display:flex;gap:8px;margin-top:8px;font-size:10px;color:var(--text3);"></div>
     </div>
     
-    <!-- All 8 models uniform grid -->
-    <div class="sport-perf-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px;">
-      <div class="sport-perf-card">
-        <div class="sport-perf-sport">🏀 NBA Basketball</div>
-        <div class="sport-perf-auc">72.7%</div>
-        <div class="sport-perf-acc">Accuracy: 66.5% · 53 features</div>
-        <div class="sport-auc-track"><div class="sport-auc-fill" style="width:72.7%"></div></div>
-        <div class="sport-mini-stats">
-          <div class="sport-mini-stat"><div class="sport-mini-label">Training</div><div class="sport-mini-val">24,290 games</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Top Feature</div><div class="sport-mini-val">Vegas Win Prob</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Home Rate</div><div class="sport-mini-val">58.8%</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Seasons</div><div class="sport-mini-val">2013–2025</div></div>
-        </div>
-      </div>
-      <div class="sport-perf-card">
-        <div class="sport-perf-sport">🏈 NFL Football</div>
-        <div class="sport-perf-auc">78.8%</div>
-        <div class="sport-perf-acc">Accuracy: 65.8% · 42 features</div>
-        <div class="sport-auc-track"><div class="sport-auc-fill" style="width:78.8%"></div></div>
-        <div class="sport-mini-stats">
-          <div class="sport-mini-stat"><div class="sport-mini-label">Training</div><div class="sport-mini-val">1,087 games</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Top Feature</div><div class="sport-mini-val">Vegas Spread</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Home Rate</div><div class="sport-mini-val">53.3%</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Seasons</div><div class="sport-mini-val">2021–2024</div></div>
-        </div>
-      </div>
-      <div class="sport-perf-card">
-        <div class="sport-perf-sport">⚾ MLB Baseball</div>
-        <div class="sport-perf-auc">61.7%</div>
-        <div class="sport-perf-acc">Accuracy: 58.1% · 20 features</div>
-        <div class="sport-auc-track"><div class="sport-auc-fill" style="width:61.7%"></div></div>
-        <div class="sport-mini-stats">
-          <div class="sport-mini-stat"><div class="sport-mini-label">Training</div><div class="sport-mini-val">2,305 games</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Top Feature</div><div class="sport-mini-val">Vegas + FIP</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Home Rate</div><div class="sport-mini-val">54.4%</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Note</div><div class="sport-mini-val">Pitcher-driven</div></div>
-        </div>
-      </div>
-      <div class="sport-perf-card">
-        <div class="sport-perf-sport">🏒 NHL Hockey</div>
-        <div class="sport-perf-auc">74.9%</div>
-        <div class="sport-perf-acc">Accuracy: 67.5% · 27 features</div>
-        <div class="sport-auc-track"><div class="sport-auc-fill" style="width:74.9%"></div></div>
-        <div class="sport-mini-stats">
-          <div class="sport-mini-stat"><div class="sport-mini-label">Training</div><div class="sport-mini-val">22,631 games</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Top Feature</div><div class="sport-mini-val">Season Pt%</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Home Rate</div><div class="sport-mini-val">53.6%</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Seasons</div><div class="sport-mini-val">2010–2026</div></div>
-        </div>
-      </div>
-    </div>
-    <div class="sport-perf-grid" style="grid-template-columns:repeat(4,1fr);">
-      <div class="sport-perf-card">
-        <div class="sport-perf-sport">🎓 College Basketball</div>
-        <div class="sport-perf-auc">86.2%</div>
-        <div class="sport-perf-acc">Accuracy: 77.4% · 38 features</div>
-        <div class="sport-auc-track"><div class="sport-auc-fill" style="width:86.2%"></div></div>
-        <div class="sport-mini-stats">
-          <div class="sport-mini-stat"><div class="sport-mini-label">Training</div><div class="sport-mini-val">37,635 games</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Top Feature</div><div class="sport-mini-val">ADJNETRTG</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Home Rate</div><div class="sport-mini-val">74.3%</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Seasons</div><div class="sport-mini-val">2013–2024</div></div>
-        </div>
-      </div>
-      <div class="sport-perf-card">
-        <div class="sport-perf-sport">🏆 March Madness</div>
-        <div class="sport-perf-auc">92.7%</div>
-        <div class="sport-perf-acc">Accuracy: 83.9% · 12 features</div>
-        <div class="sport-auc-track"><div class="sport-auc-fill" style="width:92.7%"></div></div>
-        <div class="sport-mini-stats">
-          <div class="sport-mini-stat"><div class="sport-mini-label">Training</div><div class="sport-mini-val">1.75M+ matchups</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Top Feature</div><div class="sport-mini-val">BARTHAG diff</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Use Case</div><div class="sport-mini-val">Tournament picks</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Venue</div><div class="sport-mini-val">Neutral site</div></div>
-        </div>
-      </div>
-      <div class="sport-perf-card">
-        <div class="sport-perf-sport">🎾 ATP Tennis</div>
-        <div class="sport-perf-auc">69.5%</div>
-        <div class="sport-perf-acc">Accuracy: 64.0% · 22 features</div>
-        <div class="sport-auc-track"><div class="sport-auc-fill" style="width:69.5%"></div></div>
-        <div class="sport-mini-stats">
-          <div class="sport-mini-stat"><div class="sport-mini-label">Training</div><div class="sport-mini-val">24,521 matches</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Top Feature</div><div class="sport-mini-val">Surface Winrate</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Format</div><div class="sport-mini-val">Player A vs B</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Seasons</div><div class="sport-mini-val">2015–2024</div></div>
-        </div>
-      </div>
-      <div class="sport-perf-card">
-        <div class="sport-perf-sport">⚽ EPL Soccer</div>
-        <div class="sport-perf-auc">70.7%</div>
-        <div class="sport-perf-acc">Accuracy: 57.9% · 26 features (3-way)</div>
-        <div class="sport-auc-track"><div class="sport-auc-fill" style="width:70.7%"></div></div>
-        <div class="sport-mini-stats">
-          <div class="sport-mini-stat"><div class="sport-mini-label">Training</div><div class="sport-mini-val">3,704 matches</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Top Feature</div><div class="sport-mini-val">Vegas Probs</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Home Rate</div><div class="sport-mini-val">45.5%</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Seasons</div><div class="sport-mini-val">2015–2025</div></div>
-        </div>
-      </div>
-      <div class="sport-perf-card">
-        <div class="sport-perf-sport">🏟️ College Football</div>
-        <div class="sport-perf-auc">86.7%</div>
-        <div class="sport-perf-acc">Accuracy: 77.6% · 26 features</div>
-        <div class="sport-auc-track"><div class="sport-auc-fill" style="width:86.7%"></div></div>
-        <div class="sport-mini-stats">
-          <div class="sport-mini-stat"><div class="sport-mini-label">Training</div><div class="sport-mini-val">4,444 games</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Top Feature</div><div class="sport-mini-val">SP+ Rating</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Vegas Cov.</div><div class="sport-mini-val">94.8%</div></div>
-          <div class="sport-mini-stat"><div class="sport-mini-label">Seasons</div><div class="sport-mini-val">2019–2024</div></div>
-        </div>
-      </div>
-    </div>
+   <!-- Sport cards rendered dynamically from /sports endpoint -->
+    <div id="sport-cards-container"></div> 
 
 
   </div>
@@ -1355,8 +1237,10 @@ const TEAMS = {
 };
 
 // ---- INIT ----
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   checkAPI();
+  await loadModelStats();  // populate constants from API before loading games
+  renderSidebarBars();
   loadAllGames();
   populateTeamSelects('nba');
 });
@@ -1379,7 +1263,7 @@ function showPage(p) {
   document.getElementById('tab-' + p).classList.add('active');
   if (p === 'record') loadRecord();
   if (p === 'bets') loadBets();
-  if (p === 'about') loadCalibration();
+  if (p === 'about') { loadCalibration(); renderSportCards(); }
 }
 
 async function loadCalibration() {
@@ -1746,9 +1630,74 @@ function filterSport(sport) {
   renderGames();
 }
 
-const SPORT_LABELS = {nba:'🏀 NBA',nfl:'🏈 NFL',mlb:'⚾ MLB',nhl:'🏒 NHL',ncaab:'🎓 College Basketball',cfb:'🏟️ College Football',epl:'⚽ EPL Soccer',tennis:'🎾 ATP Tennis'};
-const MODEL_AUC = {nba:0.727,nfl:0.788,mlb:0.617,ncaab:0.862,cfb:0.867,nhl:0.749,epl:0.707,tennis:0.695};
-const HOME_ADV = {nba:'58.8%',nfl:'53.3%',mlb:'54.4%',ncaab:'74.3%',cfb:'57.9%',nhl:'53.6%',epl:'45.5%',tennis:'N/A'};
+// These get populated from /sports endpoint on page load
+let SPORT_LABELS = {nba:'🏀 NBA',nfl:'🏈 NFL',mlb:'⚾ MLB',nhl:'🏒 NHL',ncaab:'🎓 College Basketball',cfb:'🏟️ College Football',epl:'⚽ EPL Soccer',tennis:'🎾 ATP Tennis'};
+let MODEL_AUC = {nba:0.727,nfl:0.788,mlb:0.617,ncaab:0.862,cfb:0.867,nhl:0.749,epl:0.707,tennis:0.695};
+let HOME_ADV = {nba:'58.8%',nfl:'53.3%',mlb:'54.4%',ncaab:'74.3%',cfb:'57.9%',nhl:'53.6%',epl:'45.5%',tennis:'N/A'};
+let MODEL_STATS = {};
+
+async function loadModelStats() {
+  try {
+    const r = await fetch(API + '/sports');
+    const d = await r.json();
+    if (d.sports) {
+      d.sports.forEach(s => {
+        if (s.key === 'ncaab_bracket') return;  // skip in main lists
+        MODEL_STATS[s.key] = s;
+        SPORT_LABELS[s.key] = `${s.icon || ''} ${s.name.replace('Basketball','').replace('Football','').replace('Hockey','').replace('Baseball','').replace('Soccer','').replace('Tennis','').trim()}`.trim();
+        MODEL_AUC[s.key] = s.auc;
+        HOME_ADV[s.key] = s.home_adv || 'N/A';
+      });
+      // Always include ncaab_bracket in stats for About page
+      const bracket = d.sports.find(s => s.key === 'ncaab_bracket');
+      if (bracket) MODEL_STATS['ncaab_bracket'] = bracket;
+    }
+  } catch(e) { console.warn('Failed to load model stats from API:', e); }
+}
+
+function renderSportCards() {
+  const container = document.getElementById('sport-cards-container');
+  if (!container) return;
+  const order = ['nba','nfl','mlb','nhl','ncaab','ncaab_bracket','cfb','epl','tennis'];
+  let html = '<div class="sport-perf-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px;">';
+  order.forEach((key, i) => {
+    const s = MODEL_STATS[key];
+    if (!s) return;
+    if (i === 4) html += '</div><div class="sport-perf-grid" style="grid-template-columns:repeat(4,1fr);">';
+    const auc = (s.auc * 100).toFixed(1);
+    const acc = (s.accuracy * 100).toFixed(1);
+    html += `
+      <div class="sport-perf-card">
+        <div class="sport-perf-sport">${s.icon || ''} ${s.name}</div>
+        <div class="sport-perf-auc">${auc}%</div>
+        <div class="sport-perf-acc">Accuracy: ${acc}% · ${s.features || '?'} features</div>
+        <div class="sport-auc-track"><div class="sport-auc-fill" style="width:${auc}%"></div></div>
+        <div class="sport-mini-stats">
+          <div class="sport-mini-stat"><div class="sport-mini-label">Training</div><div class="sport-mini-val">${s.training || '—'}</div></div>
+          <div class="sport-mini-stat"><div class="sport-mini-label">Top Feature</div><div class="sport-mini-val">${s.top_feature || '—'}</div></div>
+          <div class="sport-mini-stat"><div class="sport-mini-label">Home Rate</div><div class="sport-mini-val">${s.home_adv || '—'}</div></div>
+          <div class="sport-mini-stat"><div class="sport-mini-label">Seasons</div><div class="sport-mini-val">${s.seasons || '—'}</div></div>
+        </div>
+      </div>`;
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function renderSidebarBars() {
+  const container = document.getElementById('model-accuracy-bars');
+  if (!container) return;
+  // Sort by AUC descending, exclude ncaab_bracket (it's in March Madness category)
+  const sorted = Object.entries(MODEL_STATS)
+    .filter(([k,v]) => k !== 'ncaab_bracket' && k !== 'tennis')
+    .sort((a,b) => b[1].auc - a[1].auc);
+  container.innerHTML = sorted.map(([k,v]) => {
+    const auc = v.auc.toFixed(3);
+    const pct = (v.auc * 100).toFixed(1);
+    const label = k.toUpperCase();
+    return `<div class="model-row"><span class="model-row-name">${label}</span><div class="model-row-right"><div class="model-auc-bar"><div class="model-auc-fill" style="width:${pct}%"></div></div><span class="model-auc-val">${auc}</span></div></div>`;
+  }).join('');
+}
 
 function renderGames() {
   let filtered = currentFilter==='all' ? allGames : allGames.filter(g=>g.sport===currentFilter);
