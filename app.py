@@ -10,6 +10,18 @@ import google.auth
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
+MODEL_STATS = {
+    'nba':           {'auc': 0.727, 'accuracy': 0.665, 'name': 'NBA Basketball'},
+    'nfl':           {'auc': 0.788, 'accuracy': 0.660, 'name': 'NFL Football'},
+    'mlb':           {'auc': 0.617, 'accuracy': 0.581, 'name': 'MLB Baseball'},
+    'ncaab':         {'auc': 0.862, 'accuracy': 0.774, 'name': 'College Basketball'},
+    'ncaab_bracket': {'auc': 0.927, 'accuracy': 0.839, 'name': 'March Madness Bracket'},
+    'cfb':           {'auc': 0.867, 'accuracy': 0.776, 'name': 'College Football'},
+    'nhl':           {'auc': 0.749, 'accuracy': 0.675, 'name': 'NHL Hockey'},
+    'epl':           {'auc': 0.707, 'accuracy': 0.579, 'name': 'EPL Soccer'},
+    'tennis':        {'auc': 0.695, 'accuracy': 0.640, 'name': 'ATP Tennis'},
+}
+
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, methods=['GET', 'POST', 'PATCH', 'OPTIONS'], allow_headers=['Content-Type'])
 
@@ -19,6 +31,28 @@ GOOGLE_SHEETS_ID = os.environ.get('GOOGLE_SHEETS_ID', '')
 GOOGLE_SERVICE_ACCOUNT = os.environ.get('GOOGLE_SERVICE_ACCOUNT', '')
 ODDS_API_KEY = os.environ.get('ODDS_API_KEY', '465c281c797b25ab75b326e3e0828a9f')
 BDL_API_KEY = os.environ.get('BDL_API_KEY', '0a853bd2-7b7d-48f8-9bb4-aa7f6e74a613')
+
+# Single source of truth for model stats - update here when retraining
+MODEL_STATS = {
+    'nba':           {'auc': 0.727, 'accuracy': 0.665, 'name': 'NBA Basketball',         'icon': '🏀',
+                      'training': '24,290 games',  'top_feature': 'Vegas Win Prob',  'home_adv': '58.8%', 'seasons': '2013–2025', 'features': 53},
+    'nfl':           {'auc': 0.788, 'accuracy': 0.660, 'name': 'NFL Football',           'icon': '🏈',
+                      'training': '1,087 games',   'top_feature': 'Vegas Spread',    'home_adv': '53.3%', 'seasons': '2021–2024', 'features': 42},
+    'mlb':           {'auc': 0.617, 'accuracy': 0.581, 'name': 'MLB Baseball',           'icon': '⚾',
+                      'training': '2,305 games',   'top_feature': 'Vegas + FIP',     'home_adv': '54.4%', 'seasons': 'Pitcher-driven', 'features': 20},
+    'nhl':           {'auc': 0.749, 'accuracy': 0.675, 'name': 'NHL Hockey',             'icon': '🏒',
+                      'training': '22,631 games',  'top_feature': 'Season Pt%',      'home_adv': '53.6%', 'seasons': '2010–2026', 'features': 27},
+    'ncaab':         {'auc': 0.862, 'accuracy': 0.774, 'name': 'College Basketball',     'icon': '🎓',
+                      'training': '37,635 games',  'top_feature': 'ADJNETRTG',       'home_adv': '74.3%', 'seasons': '2013–2024', 'features': 38},
+    'ncaab_bracket': {'auc': 0.927, 'accuracy': 0.839, 'name': 'March Madness Bracket',  'icon': '🏆',
+                      'training': '1.75M+ matchups','top_feature': 'BARTHAG diff',   'home_adv': 'Neutral', 'seasons': 'Tournament', 'features': 12},
+    'cfb':           {'auc': 0.867, 'accuracy': 0.776, 'name': 'College Football',       'icon': '🏟️',
+                      'training': '4,444 games',   'top_feature': 'SP+ Rating',      'home_adv': '57.9%', 'seasons': '2019–2024', 'features': 26},
+    'epl':           {'auc': 0.707, 'accuracy': 0.579, 'name': 'EPL Soccer',             'icon': '⚽',
+                      'training': '3,704 matches', 'top_feature': 'Vegas Probs',     'home_adv': '45.5%', 'seasons': '2015–2025', 'features': 26},
+    'tennis':        {'auc': 0.695, 'accuracy': 0.640, 'name': 'ATP Tennis',             'icon': '🎾',
+                      'training': '24,521 matches','top_feature': 'Surface Winrate', 'home_adv': 'N/A',   'seasons': '2015–2024', 'features': 22},
+}
 
 # Google Sheets setup
 sheets_service = None
@@ -101,17 +135,7 @@ def health():
         'status': 'ok',
         'models_loaded': list(models.keys()),
         'sheets_connected': sheets_service is not None,
-        'model_performance': {
-            'nba':          {'auc': 0.727, 'accuracy': 0.665},
-            'nfl':          {'auc': 0.788, 'accuracy': 0.660},
-            'mlb':          {'auc': 0.617, 'accuracy': 0.581},
-            'ncaab':        {'auc': 0.862, 'accuracy': 0.774},
-            'ncaab_bracket':{'auc': 0.927, 'accuracy': 0.839},
-            'cfb':          {'auc': 0.867, 'accuracy': 0.776},
-            'nhl':          {'auc': 0.749, 'accuracy': 0.675},
-            'epl':          {'auc': 0.707, 'accuracy': 0.579},
-            'tennis':       {'auc': 0.695, 'accuracy': 0.640},
-        }
+        'model_performance': {k: {'auc': v['auc'], 'accuracy': v['accuracy']} for k, v in MODEL_STATS.items()}
     })
 
 @app.route('/predict', methods=['POST'])
@@ -892,17 +916,7 @@ def get_features(sport):
 @app.route('/sports')
 def get_sports():
     return jsonify({
-        'sports': [
-            {'key': 'nba',           'name': 'NBA Basketball',         'auc': 0.727},
-            {'key': 'nfl',           'name': 'NFL Football',           'auc': 0.788},
-            {'key': 'mlb',           'name': 'MLB Baseball',           'auc': 0.617},
-            {'key': 'ncaab',         'name': 'College Basketball',     'auc': 0.862},
-            {'key': 'ncaab_bracket', 'name': 'March Madness Bracket',  'auc': 0.927},
-            {'key': 'cfb',           'name': 'College Football',       'auc': 0.867},
-            {'key': 'nhl',           'name': 'NHL Hockey',             'auc': 0.749},
-            {'key': 'epl',           'name': 'EPL Soccer',             'auc': 0.707},
-            {'key': 'tennis',        'name': 'ATP Tennis',             'auc': 0.695},
-        ]
+        'sports': [{'key': k, **v} for k, v in MODEL_STATS.items()]
     })
 
 if __name__ == '__main__':
