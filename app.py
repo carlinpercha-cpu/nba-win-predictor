@@ -210,24 +210,25 @@ def get_record():
         clv_values = []
         for row in rows[1:]:
             if len(row) >= 9:
+                # Robust CLV calculation - handles empty strings and various edge cases
+                clv = None
+                try:
+                    raw_pred = row[9] if len(row) >= 10 else ''
+                    raw_close = row[10] if len(row) >= 11 else ''
+                    if raw_pred and raw_close and str(raw_pred).strip() and str(raw_close).strip():
+                        v_pred = float(raw_pred)
+                        v_close = float(raw_close)
+                        if 0 < v_pred < 100 and 0 < v_close < 100:
+                            model_pick_home = float(row[4]) > 50
+                            if model_pick_home:
+                                clv = round(v_close - v_pred, 1)
+                            else:
+                                clv = round(v_pred - v_close, 1)
+                            clv_values.append(clv)
+                except (ValueError, TypeError, IndexError):
+                    pass
                 vegas_at_pred = row[9] if len(row) >= 10 and row[9] not in ('', None) else None
                 closing_line = row[10] if len(row) >= 11 and row[10] not in ('', None) else None
-                
-                # Calculate CLV: positive if model picked side that line moved toward
-                clv = None
-                if vegas_at_pred and closing_line:
-                    try:
-                        v_pred = float(vegas_at_pred)
-                        v_close = float(closing_line)
-                        model_pick_home = float(row[4]) > 50
-                        # If model picked home and home % rose at close = positive CLV
-                        if model_pick_home:
-                            clv = round(v_close - v_pred, 1)
-                        else:
-                            clv = round(v_pred - v_close, 1)
-                        clv_values.append(clv)
-                    except (ValueError, TypeError):
-                        pass
                 
                 predictions.append({
                     'date': row[0],
@@ -376,8 +377,13 @@ def update_results():
                         skipped += 1
                         continue
                     competitors = comp.get('competitors', [])
+                    # Try homeAway field first, fall back to team name match
                     home = next((c for c in competitors if c.get('homeAway') == 'home'), None)
                     away = next((c for c in competitors if c.get('homeAway') == 'away'), None)
+                    if not home or not away:
+                        # Soccer fallback: match by team display name
+                        home = next((c for c in competitors if c.get('team', {}).get('displayName', '').lower() == home_team.lower() or home_team.lower() in c.get('team', {}).get('displayName', '').lower()), None)
+                        away = next((c for c in competitors if c.get('team', {}).get('displayName', '').lower() == away_team.lower() or away_team.lower() in c.get('team', {}).get('displayName', '').lower()), None)
                     if not home or not away:
                         continue
                     home_score = int(home.get('score', 0))
