@@ -17,6 +17,8 @@ MODEL_DIR = os.path.join(os.path.dirname(__file__), 'models')
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 GOOGLE_SHEETS_ID = os.environ.get('GOOGLE_SHEETS_ID', '')
 GOOGLE_SERVICE_ACCOUNT = os.environ.get('GOOGLE_SERVICE_ACCOUNT', '')
+ODDS_API_KEY = os.environ.get('ODDS_API_KEY', '465c281c797b25ab75b326e3e0828a9f')
+BDL_API_KEY = os.environ.get('BDL_API_KEY', '0a853bd2-7b7d-48f8-9bb4-aa7f6e74a613')
 
 # Google Sheets setup
 sheets_service = None
@@ -45,8 +47,11 @@ def log_prediction(sport, home_team, away_team, home_prob, away_prob, game_id, v
         if game_id in existing_ids:
             return  # already logged, skip
         
+        # Use US Eastern time so predictions are logged with the correct sport date
+        from datetime import timezone, timedelta
+        et_now = datetime.now(timezone.utc) - timedelta(hours=4)  # EDT (use 5 in winter for EST)
         row = [
-            datetime.utcnow().strftime('%Y-%m-%d'),
+            et_now.strftime('%Y-%m-%d'),
             sport.upper(),
             home_team,
             away_team,
@@ -91,7 +96,7 @@ def health():
         'sheets_connected': sheets_service is not None,
         'model_performance': {
             'nba':          {'auc': 0.727, 'accuracy': 0.665},
-            'nfl':          {'auc': 0.710, 'accuracy': 0.660},
+            'nfl':          {'auc': 0.788, 'accuracy': 0.660},
             'mlb':          {'auc': 0.617, 'accuracy': 0.581},
             'ncaab':        {'auc': 0.862, 'accuracy': 0.774},
             'ncaab_bracket':{'auc': 0.927, 'accuracy': 0.839},
@@ -345,7 +350,7 @@ def update_results():
                     # Use BallDontLie API for NBA
                     r = requests.get(
                         f'https://api.balldontlie.io/v1/games/{bdl_id}',
-                        headers={'Authorization': '0a853bd2-7b7d-48f8-9bb4-aa7f6e74a613'},
+                        headers={'Authorization': BDL_API_KEY},
                         timeout=8
                     )
                     d = r.json()
@@ -401,7 +406,7 @@ def update_closing_lines():
     if not sheets_service or not GOOGLE_SHEETS_ID:
         return jsonify({'error': 'Sheets not configured'}), 500
     
-    ODDS_KEY = '465c281c797b25ab75b326e3e0828a9f'
+    ODDS_KEY = ODDS_API_KEY
     sport_keys = {
         'NBA': 'basketball_nba',
         'NFL': 'americanfootball_nfl',
@@ -744,8 +749,10 @@ def add_bet():
         return jsonify({'error': 'Sheets not configured'}), 500
     try:
         data = request.get_json()
+        from datetime import timezone, timedelta
+        et_now = datetime.now(timezone.utc) - timedelta(hours=4)
         row = [
-            datetime.utcnow().strftime('%Y-%m-%d'),
+            et_now.strftime('%Y-%m-%d'),
             data.get('sport', ''),
             data.get('matchup', ''),
             data.get('pick', ''),
@@ -847,7 +854,7 @@ def get_sports():
     return jsonify({
         'sports': [
             {'key': 'nba',           'name': 'NBA Basketball',         'auc': 0.727},
-            {'key': 'nfl',           'name': 'NFL Football',           'auc': 0.710},
+            {'key': 'nfl',           'name': 'NFL Football',           'auc': 0.788},
             {'key': 'mlb',           'name': 'MLB Baseball',           'auc': 0.617},
             {'key': 'ncaab',         'name': 'College Basketball',     'auc': 0.862},
             {'key': 'ncaab_bracket', 'name': 'March Madness Bracket',  'auc': 0.927},
