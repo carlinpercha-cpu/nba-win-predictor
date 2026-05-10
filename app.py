@@ -355,7 +355,12 @@ def update_results():
                         continue
                     home_score = g.get('home_team_score', 0)
                     away_score = g.get('visitor_team_score', 0)
-                    actual_winner = 'home' if home_score > away_score else 'away'
+                    if home_score > away_score:
+                        actual_winner = 'home'
+                    elif away_score > home_score:
+                        actual_winner = 'away'
+                    else:
+                        actual_winner = 'draw'
                 else:
                     # ESPN for everything else
                     r = requests.get(f'https://site.api.espn.com/apis/site/v2/sports/{sport_path}/{league}/summary?event={bdl_id}', timeout=8)
@@ -372,7 +377,12 @@ def update_results():
                         continue
                     home_score = int(home.get('score', 0))
                     away_score = int(away.get('score', 0))
-                    actual_winner = 'home' if home_score > away_score else 'away'
+                    if home_score > away_score:
+                        actual_winner = 'home'
+                    elif away_score > home_score:
+                        actual_winner = 'away'
+                    else:
+                        actual_winner = 'draw'
                 sheets_service.spreadsheets().values().update(
                     spreadsheetId=GOOGLE_SHEETS_ID,
                     range=f'Sheet1!I{i}',
