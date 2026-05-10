@@ -1974,10 +1974,11 @@ async function sendChat() {
   const thinking = addMsg('bot','<span class="spinner"></span> Searching and analyzing...');
   const gamesCtx = allGames.filter(g=>g.modelProb!==null).slice(0,8)
     .map(g=>`${g.awayTeam} @ ${g.homeTeam} (${g.sport.toUpperCase()}): Model ${Math.round(g.modelProb*100)}% home win`).join('\n');
+  const aucList = Object.entries(MODEL_AUC).map(([k,v]) => `${k.toUpperCase()}: AUC ${v.toFixed(3)}`).join(' | ');
   const sys = `You are EDGE, an expert AI sports analyst with real-time web search. Help users make informed sports betting decisions.
 
 Your models:
-- NBA: AUC 0.727 | NFL: AUC 0.710 | MLB: AUC 0.653 | NCAAB: AUC 0.862 | CFB: AUC 0.867 | NHL: AUC 0.749
+- ${aucList}
 
 Today's predictions:
 ${gamesCtx}
