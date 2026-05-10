@@ -1547,8 +1547,20 @@ async function loadAllGames() {
   } catch(e) {}
   // Tennis from Odds API (no ESPN equivalent for tennis schedule)
   try {
-    const r = await fetch(`https://api.the-odds-api.com/v4/sports/tennis_atp_singles/odds/?apiKey=${ODDS_KEY}&regions=us&markets=h2h&oddsFormat=american`);
-    const tennisGames = await r.json();
+    // Fetch all active tennis tournaments dynamically
+    const sportsListResp = await fetch(`https://api.the-odds-api.com/v4/sports/?apiKey=${ODDS_KEY}`);
+    const sportsList = await sportsListResp.json();
+    const tennisKeys = (sportsList||[]).filter(s => s.key?.startsWith('tennis_') && s.active && !s.has_outrights).map(s => s.key);
+    
+    const tennisGames = [];
+    for (const tkey of tennisKeys) {
+      try {
+        const tr = await fetch(`https://api.the-odds-api.com/v4/sports/${tkey}/odds/?apiKey=${ODDS_KEY}&regions=us&markets=h2h&oddsFormat=american`);
+        const tg = await tr.json();
+        if (Array.isArray(tg)) tennisGames.push(...tg);
+      } catch(e) {}
+    }
+  
     (tennisGames||[]).forEach(g => {
       const today = new Date().toISOString().split('T')[0];
       if (!g.commence_time || !g.commence_time.startsWith(today)) return;
