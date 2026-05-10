@@ -85,6 +85,13 @@ def get_model(sport):
         try:
             models[sport] = load_model(sport)
         except Exception as e:
+            print(f"Failed to load {sport} model: {e}")
+            return None
+    # Handle case where load failed previously and got cached as None
+    if models.get(sport) is None:
+        try:
+            models[sport] = load_model(sport)
+        except Exception:
             return None
     return models[sport]
 
@@ -176,10 +183,30 @@ def predict_3way():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# Simple in-memory rate limiter for Claude proxy
+_claude_rate_limits = {}  # ip -> list of request timestamps
+
 @app.route('/claude', methods=['POST'])
 def claude_proxy():
     if not ANTHROPIC_API_KEY:
         return jsonify({'error': 'API key not configured'}), 500
+    
+    # Origin check - only allow your GitHub Pages site
+    origin = request.headers.get('Origin', '')
+    allowed_origins = ['https://carlinpercha-cpu.github.io', 'http://localhost', 'http://127.0.0.1']
+    if origin and not any(origin.startswith(o) for o in allowed_origins):
+        return jsonify({'error': 'Unauthorized origin'}), 403
+    
+    # Rate limit: 30 requests per IP per hour
+    import time
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr or 'unknown').split(',')[0].strip()
+    now = time.time()
+    hour_ago = now - 3600
+    _claude_rate_limits[ip] = [t for t in _claude_rate_limits.get(ip, []) if t > hour_ago]
+    if len(_claude_rate_limits[ip]) >= 30:
+        return jsonify({'error': 'Rate limit exceeded - please try again later'}), 429
+    _claude_rate_limits[ip].append(now)
+    
     try:
         body = request.get_json()
         response = requests.post(
@@ -460,7 +487,7 @@ def update_closing_lines():
                 if not isinstance(games, list):
                     continue
                 
-                # Build lookup: home_team|away_team -> implied prob
+                # Build lookup: home_team|away_team -> implied prob (averaged across bookmakers)
                 odds_lookup = {}
                 for g in games:
                     h = g.get('home_team', '')
@@ -468,18 +495,25 @@ def update_closing_lines():
                     bookmakers = g.get('bookmakers', [])
                     if not bookmakers:
                         continue
-                    # Use first bookmaker (DraftKings/FanDuel typically)
-                    market = bookmakers[0].get('markets', [{}])[0]
-                    outcomes = market.get('outcomes', [])
-                    home_odds = next((o['price'] for o in outcomes if o['name'] == h), None)
-                    if home_odds is None:
-                        continue
-                    # Convert American odds to implied probability
-                    if home_odds > 0:
-                        implied = 100 / (home_odds + 100)
-                    else:
-                        implied = -home_odds / (-home_odds + 100)
-                    odds_lookup[f'{h}|{a}'] = implied
+                    
+                    # Average across all bookmakers for sharper closing line
+                    implied_probs = []
+                    for bk in bookmakers:
+                        market = next((m for m in bk.get('markets', []) if m.get('key') == 'h2h'), None)
+                        if not market:
+                            continue
+                        outcomes = market.get('outcomes', [])
+                        home_odds = next((o['price'] for o in outcomes if o['name'] == h), None)
+                        if home_odds is None:
+                            continue
+                        if home_odds > 0:
+                            implied = 100 / (home_odds + 100)
+                        else:
+                            implied = -home_odds / (-home_odds + 100)
+                        implied_probs.append(implied)
+                    
+                    if implied_probs:
+                        odds_lookup[f'{h}|{a}'] = sum(implied_probs) / len(implied_probs)
                 
                 # Update matching rows
                 for entry in entries:
