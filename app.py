@@ -937,9 +937,10 @@ def update_bet(row_num):
 
 @app.route('/features/<sport>')
 def get_features(sport):
-    if sport not in models:
+    model = get_model(sport)  # Will load if not in cache
+    if not model:
         return jsonify({'error': f'Unknown sport: {sport}'}), 400
-    _, _, features = models[sport]
+    _, _, features = model
     return jsonify({'sport': sport, 'features': features})
 
 @app.route('/sports')
