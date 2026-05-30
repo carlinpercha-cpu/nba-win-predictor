@@ -130,22 +130,33 @@ def load_model(sport):
     features = joblib.load(os.path.join(MODEL_DIR, f'{sport}_features.pkl'))
     return model, scaler, features
 
-models = {}
+from collections import OrderedDict
+import gc
+
+models = OrderedDict()
+MAX_MODELS_IN_MEMORY = 3  # Keep only 3 models loaded at a time to stay under 512MB
 
 def get_model(sport):
-    if sport not in models:
-        try:
-            models[sport] = load_model(sport)
-        except Exception as e:
-            print(f"Failed to load {sport} model: {e}")
-            return None
-    # Handle case where load failed previously and got cached as None
-    if models.get(sport) is None:
-        try:
-            models[sport] = load_model(sport)
-        except Exception:
-            return None
-    return models[sport]
+    # Move to end if already loaded (LRU touch)
+    if sport in models and models[sport] is not None:
+        models.move_to_end(sport)
+        return models[sport]
+    
+    # Load fresh
+    try:
+        loaded = load_model(sport)
+    except Exception as e:
+        print(f"Failed to load {sport} model: {e}")
+        return None
+    
+    # Evict oldest if at capacity
+    while len(models) >= MAX_MODELS_IN_MEMORY:
+        evicted_sport, _ = models.popitem(last=False)
+        print(f"Evicted {evicted_sport} model to free memory")
+        gc.collect()
+    
+    models[sport] = loaded
+    return loaded
 
 @app.route('/health')
 def health():
