@@ -652,6 +652,29 @@ def get_team_stats():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
+import os, time, requests
+from flask import request, jsonify
+
+_cg_cache = {}
+
+@app.route("/cg/<path:endpoint>")
+def cg_proxy(endpoint):
+    key = endpoint + str(sorted(request.args.items()))
+    hit = _cg_cache.get(key)
+    if hit and time.time() - hit[0] < 120:
+        return jsonify(hit[1])
+    r = requests.get(
+        f"https://api.coingecko.com/api/v3/{endpoint}",
+        params=request.args,
+        headers={"x-cg-demo-api-key": os.environ.get("COINGECKO_KEY", "CG-dGTV15735Y9aCFifzKjzYf13")},
+        timeout=15,
+    )
+    data = r.json()
+    if r.ok:
+        _cg_cache[key] = (time.time(), data)
+    return jsonify(data), r.status_code
+
 def fetch_espn_team_stats(sport, league):
     """Generic ESPN team stats fetcher for any sport/league."""
     try:
